@@ -78,7 +78,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           type="text"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
-          placeholder="örn: Kullanıcı Auth Sistemi"
+          placeholder="örn: CoinBot, YoAi, Antso, Yeni Proje"
           required
           className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
         />
@@ -130,18 +130,22 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         </div>
       </div>
 
-      {/* Problem / Hedef Açıklaması */}
+      {/* Problem / Prompt */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Problem / Hedef Açıklaması
+          Problem / Prompt
         </label>
         <textarea
           value={problem}
-          onChange={(e) => setProblem(e.target.value)}
-          placeholder="Karşılaştığınız sorunu veya ulaşmak istediğiniz hedefi detaylıca açıklayın..."
+          onChange={(e) => {
+            setProblem(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = e.target.scrollHeight + "px";
+          }}
+          placeholder="Konuyu, hatayı, hedefi veya analiz edilmesini istediğin durumu detaylı yaz…"
           required
-          rows={4}
-          className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition resize-none"
+          style={{ minHeight: "160px" }}
+          className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition resize-none overflow-hidden"
         />
       </div>
 
