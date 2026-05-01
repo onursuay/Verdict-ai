@@ -20,13 +20,15 @@ const REQUEST_TYPES: RequestType[] = [
 
 const PRIORITIES: Priority[] = ["Düşük", "Orta", "Kritik"];
 
-const EXPECTED_OUTPUTS: ExpectedOutput[] = [
-  "Karar",
-  "Prompt",
-  "Teknik Plan",
-  "Hata Analizi",
-  "Kod Review",
-];
+const OUTPUT_BY_TYPE: Record<RequestType, ExpectedOutput> = {
+  Hata: "Hata Analizi",
+  "Yeni Özellik": "Prompt",
+  "Mimari Karar": "Teknik Plan",
+  "UI/UX Kararı": "Teknik Plan",
+  "API Entegrasyonu": "Teknik Plan",
+  Güvenlik: "Teknik Plan",
+  Diğer: "Karar",
+};
 
 const PRIORITY_COLORS: Record<Priority, string> = {
   Düşük: "bg-green-50 border-green-200 text-green-700 hover:bg-green-100",
@@ -45,7 +47,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [requestType, setRequestType] = useState<RequestType>("Yeni Özellik");
   const [priority, setPriority] = useState<Priority>("Orta");
   const [problem, setProblem] = useState("");
-  const [expectedOutput, setExpectedOutput] = useState<ExpectedOutput>("Karar");
   const [repoRequired, setRepoRequired] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -58,7 +59,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       requestType,
       priority,
       problem: problem.trim(),
-      expectedOutput,
+      expectedOutput: OUTPUT_BY_TYPE[requestType],
       repoRequired,
       createdAt: new Date(),
       status: "analyzing",
@@ -149,26 +150,15 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         />
       </div>
 
-      {/* Beklenen Çıktı */}
+      {/* Beklenen Çıktı — otomatik */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
           Beklenen Çıktı
         </label>
-        <div className="flex flex-wrap gap-2">
-          {EXPECTED_OUTPUTS.map((output) => (
-            <button
-              key={output}
-              type="button"
-              onClick={() => setExpectedOutput(output)}
-              className={`px-3.5 py-1.5 rounded-full text-sm border font-medium transition cursor-pointer ${
-                expectedOutput === output
-                  ? "bg-violet-600 border-violet-600 text-white"
-                  : "bg-white border-gray-200 text-gray-600 hover:border-violet-300 hover:text-violet-600"
-              }`}
-            >
-              {output}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-100 bg-gray-50 text-sm text-gray-500 select-none">
+          <span className="text-gray-400 text-xs">Otomatik:</span>
+          <span className="font-medium text-gray-700">{OUTPUT_BY_TYPE[requestType]}</span>
+          <span className="ml-auto text-xs text-gray-400">Talep tipine göre belirlenir</span>
         </div>
       </div>
 
