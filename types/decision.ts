@@ -7,6 +7,8 @@ export interface DecisionAttachment {
   contentText?: string;
   analysisStatus?: "metadata_only" | "content_extracted" | "unsupported" | "too_large" | "error";
   contentSummary?: string;
+  dataUrl?: string;
+  visionStatus?: "ready" | "analyzed" | "unsupported" | "too_large" | "error";
 }
 
 export type RequestType =

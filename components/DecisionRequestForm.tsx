@@ -82,17 +82,34 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           addIfRoom({ ...base, analysisStatus: "error", contentSummary: "Dosya okunamadı." });
         reader.readAsText(f);
       } else if (f.type.startsWith("image/")) {
-        addIfRoom({
-          ...base,
-          analysisStatus: "metadata_only",
-          contentSummary: "Görsel dosya eklendi; bu fazda görsel içeriği okunmadı.",
-        });
+        const imgReader = new FileReader();
+        imgReader.onload = (e) => {
+          const dataUrl = e.target?.result as string ?? "";
+          addIfRoom({
+            ...base,
+            dataUrl,
+            visionStatus: "ready",
+            analysisStatus: "metadata_only",
+            contentSummary: "Görsel backend tarafında analiz edilecek.",
+          });
+        };
+        imgReader.onerror = () =>
+          addIfRoom({ ...base, analysisStatus: "error", visionStatus: "error", contentSummary: "Görsel okunamadı." });
+        imgReader.readAsDataURL(f);
       } else if (f.type === "application/pdf") {
-        addIfRoom({
-          ...base,
-          analysisStatus: "metadata_only",
-          contentSummary: "PDF dosyası eklendi; bu fazda PDF içeriği okunmadı.",
-        });
+        const pdfReader = new FileReader();
+        pdfReader.onload = (e) => {
+          const dataUrl = e.target?.result as string ?? "";
+          addIfRoom({
+            ...base,
+            dataUrl,
+            analysisStatus: "metadata_only",
+            contentSummary: "PDF backend tarafında okunacak.",
+          });
+        };
+        pdfReader.onerror = () =>
+          addIfRoom({ ...base, analysisStatus: "error", contentSummary: "PDF okunamadı." });
+        pdfReader.readAsDataURL(f);
       } else {
         addIfRoom({ ...base, analysisStatus: "unsupported" });
       }

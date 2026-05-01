@@ -17,14 +17,106 @@ function stripCodeFences(text: string): string {
 function buildAttachmentContext(attachments?: DecisionAttachment[]): string {
   if (!attachments?.length) return "";
   const lines = attachments.map(a => {
-    if (a.analysisStatus === "content_extracted" && a.contentText) {
-      return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [content_extracted]\n  İçerik:\n${a.contentText}`;
+    if (a.analysisStatus === "content_extracted") {
+      if (a.contentText) {
+        return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [content_extracted]\n  Metin İçeriği:\n${a.contentText}`;
+      }
+      if (a.contentSummary) {
+        return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [content_extracted — görsel analizi]\n  Görsel Özeti:\n${a.contentSummary}`;
+      }
     }
     const status = a.analysisStatus ?? "metadata_only";
     const summary = a.contentSummary ? ` — ${a.contentSummary}` : "";
     return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [${status}]${summary}`;
   });
   return `\n\nREFERANS DOSYALAR:\nÖnemli: content_extracted durumundaki dosyaların içeriğini analizde aktif olarak kullan. metadata_only durumundaki dosyaların içeriğini görmüş gibi davranma; yalnızca dosyanın varlığını bağlam sinyali olarak değerlendir.\n\n${lines.join("\n\n")}`;
+}
+
+async function processAttachments(
+  attachments: DecisionAttachment[],
+  openaiKey: string | undefined,
+  problemContext: string
+): Promise<DecisionAttachment[]> {
+  return Promise.all(
+    attachments.map(async (att) => {
+      // ── Görsel: OpenAI Vision analizi ──────────────────────────────────────
+      if (att.visionStatus === "ready" && att.dataUrl && att.type.startsWith("image/") && openaiKey) {
+        try {
+          const openai = new OpenAI({ apiKey: openaiKey });
+          const visionRes = await openai.chat.completions.create({
+            model: OPENAI_MODEL,
+            max_tokens: 600,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: { url: att.dataUrl, detail: "low" },
+                  },
+                  {
+                    type: "text",
+                    text: `Bu görseli yazılım mühendisliği perspektifinden analiz et. Kullanıcı problemi: "${problemContext}"\n\nGörselde görülenler (UI, hata mesajı, kod, tablo, şema vb.), kullanıcı problemiyle ilgili önemli bulgular ve dikkat çeken anormallikler hakkında 200-300 kelimelik Türkçe özet yaz. Teknik ve somut ol.`,
+                  },
+                ],
+              },
+            ],
+          });
+          const summary = visionRes.choices[0]?.message?.content ?? "";
+          if (summary) {
+            const { dataUrl: _stripped, ...rest } = att;
+            void _stripped;
+            return { ...rest, contentSummary: summary, analysisStatus: "content_extracted" as const, visionStatus: "analyzed" as const };
+          }
+        } catch (err) {
+          console.warn("[verdict-ai] Vision error for", att.name, ":", err instanceof Error ? err.message : "unknown");
+        }
+        const { dataUrl: _stripped, ...rest } = att;
+        void _stripped;
+        return { ...rest, visionStatus: "error" as const };
+      }
+
+      // ── PDF: metin çıkarma ──────────────────────────────────────────────────
+      if (att.type === "application/pdf" && att.dataUrl) {
+        try {
+          const base64 = att.dataUrl.split(",")[1];
+          if (base64) {
+            const buffer = Buffer.from(base64, "base64");
+            // pdf-parse CJS/ESM interop: default may be the function itself
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const pdfModule = await import("pdf-parse") as any;
+            const pdfParse = pdfModule.default ?? pdfModule;
+            const parsed = await pdfParse(buffer);
+            const text = (parsed.text ?? "").slice(0, 15000);
+            const { dataUrl: _stripped, ...rest } = att;
+            void _stripped;
+            return { ...rest, contentText: text, analysisStatus: "content_extracted" as const };
+          }
+        } catch (err) {
+          console.warn("[verdict-ai] PDF parse error for", att.name, ":", err instanceof Error ? err.message : "unknown");
+          const { dataUrl: _stripped, ...rest } = att;
+          void _stripped;
+          return { ...rest, analysisStatus: "error" as const, contentSummary: "PDF içeriği okunamadı." };
+        }
+        const { dataUrl: _stripped, ...rest } = att;
+        void _stripped;
+        return { ...rest, analysisStatus: "metadata_only" as const };
+      }
+
+      // ── Diğer: dataUrl varsa strip et, metadata kalsın ─────────────────────
+      if (att.dataUrl) {
+        const { dataUrl: _stripped, ...rest } = att;
+        void _stripped;
+        return rest;
+      }
+
+      return att;
+    })
+  );
+}
+
+function stripDataUrls(attachments: DecisionAttachment[]): DecisionAttachment[] {
+  return attachments.map(({ dataUrl: _d, ...rest }) => { void _d; return rest; });
 }
 
 // ─── Claude prompt & parser ──────────────────────────────────────────────────
@@ -238,14 +330,27 @@ export async function POST(req: NextRequest) {
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
+  const rawAttachments = request.attachments ?? [];
+  const hasImages = rawAttachments.some(a => a.visionStatus === "ready");
+  const hasPdfs = rawAttachments.some(a => a.type === "application/pdf" && a.dataUrl);
   console.log("[verdict-ai] analyze", {
     hasAnthropicKey: !!anthropicKey,
     hasOpenAIKey: !!openaiKey,
     openaiModel: OPENAI_MODEL,
     claudeModel: CLAUDE_MODEL,
+    attachments: rawAttachments.length,
+    hasImages,
+    hasPdfs,
   });
 
-  const mockResult = generateMockDecision(request);
+  // Pre-step: Görsel vision analizi + PDF metin çıkarma
+  const processedAttachments = rawAttachments.length
+    ? await processAttachments(rawAttachments, openaiKey, request.problem)
+    : [];
+  // request içindeki attachments'ı işlenmiş (dataUrl olmayan) versiyonla güncelle
+  const enrichedRequest: DecisionRequest = { ...request, attachments: processedAttachments };
+
+  const mockResult = generateMockDecision(enrichedRequest);
   const mockClaudeAnalysis = mockResult.analyses.find((a) => a.role === "claude_engineer")!;
   const mockCodexAnalysis = mockResult.analyses.find((a) => a.role === "codex_reviewer")!;
 
@@ -259,7 +364,7 @@ export async function POST(req: NextRequest) {
       const message = await anthropic.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: 1024,
-        messages: [{ role: "user", content: buildClaudePrompt(request) }],
+        messages: [{ role: "user", content: buildClaudePrompt(enrichedRequest) }],
       });
       const text = message.content[0].type === "text" ? message.content[0].text : "";
       claudeAnalysis = parseClaudeAnalysis(text, mockClaudeAnalysis);
@@ -279,7 +384,7 @@ export async function POST(req: NextRequest) {
       const codexCompletion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         max_tokens: 1024,
-        messages: [{ role: "user", content: buildCodexPrompt(request, claudeAnalysis) }],
+        messages: [{ role: "user", content: buildCodexPrompt(enrichedRequest, claudeAnalysis) }],
       });
       const codexText = codexCompletion.choices[0]?.message?.content ?? "";
       codexAnalysis = parseCodexAnalysis(codexText, mockCodexAnalysis);
@@ -299,7 +404,7 @@ export async function POST(req: NextRequest) {
       const judgeCompletion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         max_tokens: 1024,
-        messages: [{ role: "user", content: buildJudgePrompt(request, claudeAnalysis, codexAnalysis) }],
+        messages: [{ role: "user", content: buildJudgePrompt(enrichedRequest, claudeAnalysis, codexAnalysis) }],
       });
       const judgeText = judgeCompletion.choices[0]?.message?.content ?? "";
       finalVerdict = parseJudgeVerdict(judgeText, mockResult.finalVerdict);
@@ -331,19 +436,19 @@ export async function POST(req: NextRequest) {
       const { data, error } = await supabase
         .from("decision_records")
         .insert({
-          project_name: request.projectName,
-          request_type: request.requestType,
-          priority: request.priority,
-          problem: request.problem,
-          expected_output: request.expectedOutput,
-          repo_required: request.repoRequired,
-          status: request.status,
+          project_name: enrichedRequest.projectName,
+          request_type: enrichedRequest.requestType,
+          priority: enrichedRequest.priority,
+          problem: enrichedRequest.problem,
+          expected_output: enrichedRequest.expectedOutput,
+          repo_required: enrichedRequest.repoRequired,
+          status: enrichedRequest.status,
           claude_source: claudeSource,
           codex_source: codexSource,
           judge_source: judgeSource,
-          request_json: request,
+          request_json: enrichedRequest,
           result_json: finalResult,
-          attachments_json: request.attachments ?? [],
+          attachments_json: stripDataUrls(processedAttachments),
         })
         .select("id")
         .single();

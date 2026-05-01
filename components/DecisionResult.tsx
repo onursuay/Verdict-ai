@@ -447,14 +447,25 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                             ? "bg-red-50 text-red-600 border-red-200"
                             : "bg-gray-50 text-gray-500 border-gray-200"
                         }`}>
-                          {att.analysisStatus === "content_extracted" ? "İçerik analiz edildi"
-                            : att.analysisStatus === "metadata_only" ? "Sadece metadata"
+                          {att.analysisStatus === "content_extracted"
+                            ? att.visionStatus === "analyzed"
+                              ? "Görsel içeriği analiz edildi"
+                              : att.type === "application/pdf"
+                              ? "PDF içeriği analiz edildi"
+                              : "İçerik analiz edildi"
+                            : att.analysisStatus === "metadata_only" ? "Sadece dosya bilgisi kullanıldı"
                             : att.analysisStatus === "too_large" ? "Çok büyük"
                             : att.analysisStatus === "unsupported" ? "Desteklenmiyor"
-                            : att.analysisStatus === "error" ? "Hata"
+                            : att.analysisStatus === "error" ? "İçerik okunamadı"
                             : "Metadata"}
                         </span>
                       </div>
+                      {att.analysisStatus === "content_extracted" && att.visionStatus === "analyzed" && att.contentSummary && (
+                        <p className="mt-2 text-gray-600 bg-blue-50 rounded p-2 text-[12px] leading-relaxed border border-blue-100">
+                          <span className="font-medium text-blue-700 block mb-0.5">Görsel analizi:</span>
+                          {att.contentSummary.slice(0, 400)}{att.contentSummary.length > 400 ? "…" : ""}
+                        </p>
+                      )}
                       {att.analysisStatus === "content_extracted" && att.contentText && (
                         <p className="mt-2 text-gray-500 bg-gray-50 rounded p-2 font-mono text-[11px] leading-relaxed break-all">
                           {att.contentText.slice(0, 300)}{att.contentText.length > 300 ? "…" : ""}
