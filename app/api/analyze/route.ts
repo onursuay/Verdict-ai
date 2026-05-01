@@ -14,6 +14,20 @@ function stripCodeFences(text: string): string {
   return text.replace(/^```[\w]*\n?/gm, "").replace(/^```$/gm, "").trim();
 }
 
+function cleanExtractedText(text: string): string {
+  // RTF detection: strip control words if file was .txt but contains RTF markup
+  if (text.trimStart().startsWith("{\\rtf")) {
+    return text
+      .replace(/\{\\rtf[\s\S]*?\{/g, "{")
+      .replace(/\\[a-z]+\d* ?/gi, " ")
+      .replace(/[{}\\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 15000);
+  }
+  return text;
+}
+
 function buildAttachmentContext(attachments?: DecisionAttachment[]): string {
   if (!attachments?.length) return "";
   const lines = attachments.map(a => {
@@ -39,8 +53,16 @@ async function processAttachments(
 ): Promise<DecisionAttachment[]> {
   return Promise.all(
     attachments.map(async (att) => {
+      const logMeta = { name: att.name, type: att.type, sizeKB: Math.round(att.size / 1024), hasDataUrl: !!att.dataUrl, visionStatus: att.visionStatus };
+
       // ── Görsel: OpenAI Vision analizi ──────────────────────────────────────
-      if (att.visionStatus === "ready" && att.dataUrl && att.type.startsWith("image/") && openaiKey) {
+      if (att.visionStatus === "ready" && att.dataUrl && att.type.startsWith("image/")) {
+        if (!openaiKey) {
+          console.log("[verdict-ai] vision skip (no key)", logMeta);
+          const { dataUrl: _d, ...rest } = att; void _d;
+          return { ...rest, visionStatus: "error" as const, contentSummary: "OpenAI key yok; görsel analizi yapılamadı." };
+        }
+        console.log("[verdict-ai] vision attempt", logMeta);
         try {
           const openai = new OpenAI({ apiKey: openaiKey });
           const visionRes = await openai.chat.completions.create({
@@ -50,10 +72,7 @@ async function processAttachments(
               {
                 role: "user",
                 content: [
-                  {
-                    type: "image_url",
-                    image_url: { url: att.dataUrl, detail: "low" },
-                  },
+                  { type: "image_url", image_url: { url: att.dataUrl, detail: "low" } },
                   {
                     type: "text",
                     text: `Bu görseli yazılım mühendisliği perspektifinden analiz et. Kullanıcı problemi: "${problemContext}"\n\nGörselde görülenler (UI, hata mesajı, kod, tablo, şema vb.), kullanıcı problemiyle ilgili önemli bulgular ve dikkat çeken anormallikler hakkında 200-300 kelimelik Türkçe özet yaz. Teknik ve somut ol.`,
@@ -64,49 +83,54 @@ async function processAttachments(
           });
           const summary = visionRes.choices[0]?.message?.content ?? "";
           if (summary) {
-            const { dataUrl: _stripped, ...rest } = att;
-            void _stripped;
+            console.log("[verdict-ai] vision success", { name: att.name, summaryLen: summary.length });
+            const { dataUrl: _d, ...rest } = att; void _d;
             return { ...rest, contentSummary: summary, analysisStatus: "content_extracted" as const, visionStatus: "analyzed" as const };
           }
+          console.warn("[verdict-ai] vision empty response", logMeta);
         } catch (err) {
-          console.warn("[verdict-ai] Vision error for", att.name, ":", err instanceof Error ? err.message : "unknown");
+          console.warn("[verdict-ai] vision error", { name: att.name, error: err instanceof Error ? err.message : "unknown" });
         }
-        const { dataUrl: _stripped, ...rest } = att;
-        void _stripped;
-        return { ...rest, visionStatus: "error" as const };
+        const { dataUrl: _d, ...rest } = att; void _d;
+        return { ...rest, visionStatus: "error" as const, contentSummary: "Görsel analizi başarısız." };
       }
 
       // ── PDF: metin çıkarma ──────────────────────────────────────────────────
       if (att.type === "application/pdf" && att.dataUrl) {
+        console.log("[verdict-ai] pdf parse attempt", logMeta);
         try {
           const base64 = att.dataUrl.split(",")[1];
-          if (base64) {
-            const buffer = Buffer.from(base64, "base64");
-            // pdf-parse CJS/ESM interop: default may be the function itself
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const pdfModule = await import("pdf-parse") as any;
-            const pdfParse = pdfModule.default ?? pdfModule;
-            const parsed = await pdfParse(buffer);
-            const text = (parsed.text ?? "").slice(0, 15000);
-            const { dataUrl: _stripped, ...rest } = att;
-            void _stripped;
-            return { ...rest, contentText: text, analysisStatus: "content_extracted" as const };
-          }
+          if (!base64) throw new Error("base64 boş");
+          const buffer = Buffer.from(base64, "base64");
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const pdfModule = await import("pdf-parse") as any;
+          const pdfParse = pdfModule.default ?? pdfModule;
+          const parsed = await pdfParse(buffer);
+          const rawText = (parsed.text ?? "").slice(0, 15000);
+          const text = cleanExtractedText(rawText);
+          console.log("[verdict-ai] pdf parse success", { name: att.name, textLen: text.length });
+          const { dataUrl: _d, ...rest } = att; void _d;
+          return { ...rest, contentText: text, analysisStatus: "content_extracted" as const };
         } catch (err) {
-          console.warn("[verdict-ai] PDF parse error for", att.name, ":", err instanceof Error ? err.message : "unknown");
-          const { dataUrl: _stripped, ...rest } = att;
-          void _stripped;
+          console.warn("[verdict-ai] pdf parse error", { name: att.name, error: err instanceof Error ? err.message : "unknown" });
+          const { dataUrl: _d, ...rest } = att; void _d;
           return { ...rest, analysisStatus: "error" as const, contentSummary: "PDF içeriği okunamadı." };
         }
-        const { dataUrl: _stripped, ...rest } = att;
-        void _stripped;
-        return { ...rest, analysisStatus: "metadata_only" as const };
       }
 
-      // ── Diğer: dataUrl varsa strip et, metadata kalsın ─────────────────────
+      // ── TXT/JSON/MD: RTF temizleme ─────────────────────────────────────────
+      if (att.contentText) {
+        const cleaned = cleanExtractedText(att.contentText);
+        if (cleaned !== att.contentText) {
+          console.log("[verdict-ai] rtf cleaned", { name: att.name });
+        }
+        const { dataUrl: _d, ...rest } = att; void _d;
+        return { ...rest, contentText: cleaned };
+      }
+
+      // ── Diğer: dataUrl varsa strip et ──────────────────────────────────────
       if (att.dataUrl) {
-        const { dataUrl: _stripped, ...rest } = att;
-        void _stripped;
+        const { dataUrl: _d, ...rest } = att; void _d;
         return rest;
       }
 
@@ -463,5 +487,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ...finalResult, saved, recordId });
+  return NextResponse.json({ ...finalResult, saved, recordId, enrichedAttachments: processedAttachments });
 }

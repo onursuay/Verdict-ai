@@ -29,12 +29,18 @@ export default function Home() {
       const data: DecisionResultType = await res.json();
       setCurrentResult(data);
       setClaudeSource((data.claudeSource as AnalysisSource) ?? "mock");
+      // Use enriched attachments from backend (visionStatus/analysisStatus updated)
+      setCurrentRequest(
+        data.enrichedAttachments?.length
+          ? { ...request, attachments: data.enrichedAttachments }
+          : request
+      );
     } catch {
       const fallback = generateMockDecision(request);
       setCurrentResult(fallback);
       setClaudeSource("mock");
-    } finally {
       setCurrentRequest(request);
+    } finally {
       setIsLoading(false);
       setView("result");
     }

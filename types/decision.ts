@@ -92,4 +92,5 @@ export interface DecisionResult {
   judgeSource?: AnalysisSource;
   saved?: boolean;
   recordId?: string;
+  enrichedAttachments?: DecisionAttachment[];
 }
