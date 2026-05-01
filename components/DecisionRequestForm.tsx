@@ -44,23 +44,24 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [projectName, setProjectName] = useState("");
   const [requestType, setRequestType] = useState<RequestType>("Yeni Özellik");
   const [priority, setPriority] = useState<Priority>("Orta");
-  const [description, setDescription] = useState("");
+  const [problem, setProblem] = useState("");
   const [expectedOutput, setExpectedOutput] = useState<ExpectedOutput>("Karar");
   const [repoRequired, setRepoRequired] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectName.trim() || !description.trim()) return;
+    if (!projectName.trim() || !problem.trim()) return;
 
     const request: DecisionRequest = {
       id: `req-${Date.now()}`,
       projectName: projectName.trim(),
       requestType,
       priority,
-      description: description.trim(),
+      problem: problem.trim(),
       expectedOutput,
       repoRequired,
       createdAt: new Date(),
+      status: "analyzing",
     };
 
     onSubmit(request);
@@ -135,8 +136,8 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           Problem / Hedef Açıklaması
         </label>
         <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          value={problem}
+          onChange={(e) => setProblem(e.target.value)}
           placeholder="Karşılaştığınız sorunu veya ulaşmak istediğiniz hedefi detaylıca açıklayın..."
           required
           rows={4}
@@ -193,7 +194,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       {/* Submit */}
       <button
         type="submit"
-        disabled={isLoading || !projectName.trim() || !description.trim()}
+        disabled={isLoading || !projectName.trim() || !problem.trim()}
         className="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white disabled:text-gray-400 font-semibold rounded-xl transition-all text-sm tracking-wide cursor-pointer"
       >
         {isLoading ? (

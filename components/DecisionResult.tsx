@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ActionStatus, DecisionRequest, DecisionResult as DecisionResultType } from "@/types/decision";
+import { DecisionRequest, DecisionResult as DecisionResultType, DecisionStatus } from "@/types/decision";
 import DecisionCard from "./DecisionCard";
 import ActionButtons from "./ActionButtons";
 
@@ -17,12 +17,23 @@ const PRIORITY_BADGE: Record<string, { label: string; className: string }> = {
   Düşük: { label: "DÜŞÜK", className: "bg-green-100 text-green-700 border border-green-200" },
 };
 
-export default function DecisionResult({ request, result: initialResult, onReset }: DecisionResultProps) {
-  const [result, setResult] = useState(initialResult);
+function ConfidenceBadge({ score }: { score: number }) {
+  const color =
+    score >= 85 ? "bg-green-100 text-green-700" :
+    score >= 70 ? "bg-yellow-100 text-yellow-700" :
+    "bg-red-100 text-red-700";
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>
+      Güven %{score}
+    </span>
+  );
+}
 
-  const handleStatusChange = (status: ActionStatus) => {
-    setResult((prev) => ({ ...prev, status }));
-  };
+export default function DecisionResult({ request, result, onReset }: DecisionResultProps) {
+  const [status, setStatus] = useState<DecisionStatus>(request.status);
+
+  const claude = result.analyses.find((a) => a.role === "claude_engineer")!;
+  const codex = result.analyses.find((a) => a.role === "codex_reviewer")!;
 
   const badge = PRIORITY_BADGE[request.priority];
 
@@ -59,12 +70,17 @@ export default function DecisionResult({ request, result: initialResult, onReset
 
       {/* Nihai Karar — Öne Çıkan Kart */}
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-5 text-white">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">🏆</span>
-          <span className="text-sm font-semibold opacity-90">ChatGPT Hakem Kararı</span>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🏆</span>
+            <span className="text-sm font-semibold opacity-90">ChatGPT Hakem Kararı</span>
+          </div>
+          <span className="text-xs font-semibold bg-white/20 text-white px-2.5 py-1 rounded-full">
+            Güven %{result.finalVerdict.confidenceScore}
+          </span>
         </div>
         <p className="text-base font-medium leading-relaxed">
-          {result.chatGPTVerdict.finalDecision}
+          {result.finalVerdict.verdict}
         </p>
       </div>
 
@@ -72,14 +88,14 @@ export default function DecisionResult({ request, result: initialResult, onReset
         {/* Uygulanacak Yol */}
         <DecisionCard title="Uygulanacak Yol" icon="🗺️" badge="Onaylı" badgeColor="green">
           <p className="text-sm text-gray-600 leading-relaxed">
-            {result.chatGPTVerdict.implementationPath}
+            {result.finalVerdict.executionPlan}
           </p>
           <div className="mt-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
               Sonraki Aksiyon
             </p>
             <p className="text-sm text-gray-700 bg-green-50 rounded-lg p-3 border border-green-100">
-              {result.chatGPTVerdict.nextAction}
+              {result.finalVerdict.nextAction}
             </p>
           </div>
         </DecisionCard>
@@ -87,7 +103,7 @@ export default function DecisionResult({ request, result: initialResult, onReset
         {/* Riskler */}
         <DecisionCard title="Riskler & Dikkat Noktaları" icon="⚠️" badge="İncelenmeli" badgeColor="amber">
           <ul className="space-y-2">
-            {result.claudeAnalysis.risks.map((risk, i) => (
+            {result.finalVerdict.risks.map((risk, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
                 <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>
                 {risk}
@@ -99,7 +115,7 @@ export default function DecisionResult({ request, result: initialResult, onReset
               Reddedilen Öneriler
             </p>
             <ul className="space-y-1.5">
-              {result.chatGPTVerdict.rejectedSuggestions.map((s, i) => (
+              {result.finalVerdict.rejectedSuggestions.map((s, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-gray-500 line-through">
                   <span className="text-red-400 no-underline">✕</span>
                   {s}
@@ -115,46 +131,72 @@ export default function DecisionResult({ request, result: initialResult, onReset
         {/* Claude Analizi */}
         <DecisionCard title="Claude Code Analizi" icon="🤖" badge="Ana Mühendis" badgeColor="indigo">
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500 italic">{claude.title}</p>
+              <ConfidenceBadge score={claude.confidenceScore} />
+            </div>
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                Mühendis Görüşü
+                Özet
               </p>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {result.claudeAnalysis.engineerOpinion}
-              </p>
+              <p className="text-sm text-gray-600 leading-relaxed">{claude.summary}</p>
             </div>
             <div className="pt-3 border-t border-gray-100">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                Uygulanabilirlik
+                Öneri
               </p>
-              <p className="text-sm text-gray-700 font-medium">
-                {result.claudeAnalysis.feasibility}
-              </p>
+              <p className="text-sm text-gray-700 font-medium">{claude.recommendation}</p>
             </div>
+            {claude.objections.length > 0 && (
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                  İtirazlar
+                </p>
+                <ul className="space-y-1">
+                  {claude.objections.map((obj, i) => (
+                    <li key={i} className="text-xs text-gray-500 flex items-start gap-1.5">
+                      <span className="text-orange-400 flex-shrink-0">!</span>
+                      {obj}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </DecisionCard>
 
         {/* Codex Denetimi */}
         <DecisionCard title="Codex Denetimi" icon="🔍" badge="Kod Denetçisi" badgeColor="violet">
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500 italic">{codex.title}</p>
+              <ConfidenceBadge score={codex.confidenceScore} />
+            </div>
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                Kod Riski
+                Özet
               </p>
-              <p className="text-sm text-gray-600">{result.codexReview.codeRisk}</p>
+              <p className="text-sm text-gray-600">{codex.summary}</p>
             </div>
             <div className="pt-3 border-t border-gray-100">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                Test Riski
+                Riskler
               </p>
-              <p className="text-sm text-gray-600">{result.codexReview.testRisk}</p>
+              <ul className="space-y-1.5">
+                {codex.risks.map((risk, i) => (
+                  <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                    <span className="text-amber-400 flex-shrink-0">•</span>
+                    {risk}
+                  </li>
+                ))}
+              </ul>
             </div>
             <div className="pt-3 border-t border-gray-100">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
                 Alternatif Öneri
               </p>
               <p className="text-sm text-gray-700 bg-violet-50 rounded-lg p-3 border border-violet-100">
-                {result.codexReview.alternativeSuggestion}
+                {codex.recommendation}
               </p>
             </div>
           </div>
@@ -166,7 +208,7 @@ export default function DecisionResult({ request, result: initialResult, onReset
         <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
           <span>⚡</span> Aksiyonlar
         </h3>
-        <ActionButtons result={result} onStatusChange={handleStatusChange} />
+        <ActionButtons result={result} status={status} onStatusChange={setStatus} />
       </div>
     </div>
   );
