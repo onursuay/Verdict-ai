@@ -65,10 +65,13 @@ export interface DecisionRequest {
   status: DecisionStatus;
 }
 
+export type AnalysisSource = "mock" | "live";
+
 export interface DecisionResult {
   requestId: string;
   analyses: AIAnalysis[];
   finalVerdict: FinalVerdict;
   promptOutput: PromptOutput;
   createdAt: Date;
+  claudeSource?: AnalysisSource;
 }

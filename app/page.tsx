@@ -4,7 +4,7 @@ import { useState } from "react";
 import DecisionRequestForm from "@/components/DecisionRequestForm";
 import DecisionResult from "@/components/DecisionResult";
 import { generateMockDecision } from "@/lib/mock-decision";
-import { DecisionRequest, DecisionResult as DecisionResultType } from "@/types/decision";
+import { AnalysisSource, DecisionRequest, DecisionResult as DecisionResultType } from "@/types/decision";
 
 type ViewState = "form" | "result";
 
@@ -13,21 +13,38 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentRequest, setCurrentRequest] = useState<DecisionRequest | null>(null);
   const [currentResult, setCurrentResult] = useState<DecisionResultType | null>(null);
+  const [claudeSource, setClaudeSource] = useState<AnalysisSource>("mock");
 
   const handleSubmit = async (request: DecisionRequest) => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1800));
-    const result = generateMockDecision(request);
-    setCurrentRequest(request);
-    setCurrentResult(result);
-    setIsLoading(false);
-    setView("result");
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+
+      if (!res.ok) throw new Error("API hatası");
+
+      const data: DecisionResultType = await res.json();
+      setCurrentResult(data);
+      setClaudeSource((data.claudeSource as AnalysisSource) ?? "mock");
+    } catch {
+      const fallback = generateMockDecision(request);
+      setCurrentResult(fallback);
+      setClaudeSource("mock");
+    } finally {
+      setCurrentRequest(request);
+      setIsLoading(false);
+      setView("result");
+    }
   };
 
   const handleReset = () => {
     setView("form");
     setCurrentRequest(null);
     setCurrentResult(null);
+    setClaudeSource("mock");
   };
 
   return (
@@ -47,9 +64,15 @@ export default function Home() {
             <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
               MVP v0.1
             </span>
-            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-              Mock Mod
-            </span>
+            {claudeSource === "live" ? (
+              <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                Claude Canlı
+              </span>
+            ) : (
+              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                Mock Mod
+              </span>
+            )}
           </div>
         </div>
       </header>
@@ -133,7 +156,10 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="mt-16 pb-8 text-center text-xs text-gray-400">
-        Verdict AI — Mock Mod · Gerçek API entegrasyonu için yapılandırılmamış
+        Verdict AI —{" "}
+        {claudeSource === "live"
+          ? "Claude API aktif · claude_engineer analizi canlı"
+          : "Mock Mod · ANTHROPIC_API_KEY tanımlanmamış"}
       </footer>
     </div>
   );
