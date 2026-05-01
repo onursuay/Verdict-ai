@@ -117,10 +117,10 @@ function parseJudgeVerdict(text: string, fallback: FinalVerdict): FinalVerdict {
     if (!match) return fallback;
     const p = JSON.parse(match[0]);
 
-    const executionPlan = Array.isArray(p.executionPlan)
-      ? p.executionPlan.map(String).join(" → ")
-      : typeof p.executionPlan === "string"
-        ? p.executionPlan
+    const executionPlan: string[] = Array.isArray(p.executionPlan)
+      ? p.executionPlan.map(String)
+      : typeof p.executionPlan === "string" && p.executionPlan.trim()
+        ? [p.executionPlan]
         : fallback.executionPlan;
 
     return {

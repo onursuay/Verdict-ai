@@ -120,7 +120,13 @@ export function generateMockDecision(request: DecisionRequest): DecisionResult {
 
   const finalVerdict: FinalVerdict = {
     verdict: `"${request.projectName}" için ${request.requestType} talebi ONAYLANMIŞTIR. ${request.priority} öncelik seviyesi gözetilerek ${request.priority === "Kritik" ? "bu sprint içinde" : request.priority === "Orta" ? "bir sonraki sprint'te" : "backlog'a alınarak"} ele alınmalıdır.`,
-    executionPlan: `1. Gereksinim dokümanı hazırla → 2. Teknik tasarım onaylat → 3. Staging'de geliştir → 4. Code review yap → 5. ${request.repoRequired ? "Repo bağlantısıyla birlikte " : ""}Production'a deploy et`,
+    executionPlan: [
+      "Gereksinim dokümanı hazırla",
+      "Teknik tasarım onaylat",
+      "Staging'de geliştir",
+      "Code review yap",
+      `${request.repoRequired ? "Repo bağlantısıyla birlikte p" : "P"}roduction'a deploy et`,
+    ],
     rejectedSuggestions: [
       "Hotfix olarak direkt production'a deploy etme",
       "Test sürecini atlayarak hızlı çözüm üretme",

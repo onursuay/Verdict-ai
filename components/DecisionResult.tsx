@@ -96,9 +96,16 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Uygulanacak Yol */}
         <DecisionCard title="Uygulanacak Yol" icon="🗺️" badge="Onaylı" badgeColor="green">
-          <p className="text-sm text-gray-600 leading-relaxed">
-            {result.finalVerdict.executionPlan}
-          </p>
+          <ol className="space-y-2">
+            {result.finalVerdict.executionPlan.map((step, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center mt-0.5">
+                  {i + 1}
+                </span>
+                {step}
+              </li>
+            ))}
+          </ol>
           <div className="mt-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
               Sonraki Aksiyon

@@ -40,7 +40,7 @@ export interface AIAnalysis {
 
 export interface FinalVerdict {
   verdict: string;
-  executionPlan: string;
+  executionPlan: string[];
   rejectedSuggestions: string[];
   risks: string[];
   nextAction: string;
