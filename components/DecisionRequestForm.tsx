@@ -177,10 +177,13 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             }`}
           />
         </button>
-        <span className="text-sm text-gray-700">
-          Repo erişimi gerekli
-          <span className="ml-1.5 text-gray-400 text-xs">
-            (AI analizine repo bağlamı dahil edilsin)
+        <span className="text-sm text-gray-700 flex items-center gap-2 flex-wrap">
+          Kod deposu analizi gerekli
+          <span className="text-gray-400 text-xs font-normal">
+            AI karar verirken GitHub repo/kod bağlamı gerekiyorsa açın.
+          </span>
+          <span className="text-xs font-medium text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
+            Hazırlık
           </span>
         </span>
       </div>
