@@ -70,10 +70,19 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
 
       {/* Nihai Karar — Öne Çıkan Kart */}
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-5 text-white">
-        <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-lg">🏆</span>
             <span className="text-sm font-semibold opacity-90">ChatGPT Hakem Kararı</span>
+            {result.judgeSource === "live" ? (
+              <span className="text-xs font-semibold bg-green-400/30 text-green-100 border border-green-300/30 px-2 py-0.5 rounded-full">
+                Canlı Hakem
+              </span>
+            ) : (
+              <span className="text-xs font-semibold bg-white/15 text-white/70 px-2 py-0.5 rounded-full">
+                Mock Hakem
+              </span>
+            )}
           </div>
           <span className="text-xs font-semibold bg-white/20 text-white px-2.5 py-1 rounded-full">
             Güven %{result.finalVerdict.confidenceScore}
