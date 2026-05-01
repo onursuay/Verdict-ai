@@ -95,26 +95,40 @@ async function processAttachments(
         return { ...rest, visionStatus: "error" as const, contentSummary: "Görsel analizi başarısız." };
       }
 
-      // ── PDF: metin çıkarma ──────────────────────────────────────────────────
+      // ── PDF: metin çıkarma (pdf-parse@2.x: PDFParse class API) ─────────────
       if (att.type === "application/pdf" && att.dataUrl) {
         console.log("[verdict-ai] pdf parse attempt", logMeta);
+        let parser: { getText: () => Promise<{ text: string }>; destroy: () => Promise<void> } | undefined;
         try {
-          const base64 = att.dataUrl.split(",")[1];
+          const commaIdx = att.dataUrl.indexOf(",");
+          const base64 = commaIdx >= 0 ? att.dataUrl.slice(commaIdx + 1) : att.dataUrl;
           if (!base64) throw new Error("base64 boş");
           const buffer = Buffer.from(base64, "base64");
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const pdfModule = await import("pdf-parse") as any;
-          const pdfParse = pdfModule.default ?? pdfModule;
-          const parsed = await pdfParse(buffer);
-          const rawText = (parsed.text ?? "").slice(0, 15000);
+          console.log("[verdict-ai] pdf buffer", { name: att.name, base64Len: base64.length, bufferLen: buffer.length });
+
+          const { PDFParse } = await import("pdf-parse");
+          parser = new PDFParse({ data: buffer });
+          const result = await parser.getText();
+          const rawText = (result.text ?? "").slice(0, 15000);
           const text = cleanExtractedText(rawText);
           console.log("[verdict-ai] pdf parse success", { name: att.name, textLen: text.length });
           const { dataUrl: _d, ...rest } = att; void _d;
-          return { ...rest, contentText: text, analysisStatus: "content_extracted" as const };
+          return {
+            ...rest,
+            contentText: text,
+            analysisStatus: "content_extracted" as const,
+            contentSummary: "PDF içeriği analiz edildi.",
+          };
         } catch (err) {
-          console.warn("[verdict-ai] pdf parse error", { name: att.name, error: err instanceof Error ? err.message : "unknown" });
+          console.warn("[verdict-ai] pdf parse error", {
+            name: att.name,
+            error: err instanceof Error ? err.message : "unknown",
+            stack: err instanceof Error ? err.stack?.split("\n").slice(0, 3).join(" | ") : undefined,
+          });
           const { dataUrl: _d, ...rest } = att; void _d;
           return { ...rest, analysisStatus: "error" as const, contentSummary: "PDF içeriği okunamadı." };
+        } finally {
+          try { await parser?.destroy(); } catch { /* ignore cleanup errors */ }
         }
       }
 
