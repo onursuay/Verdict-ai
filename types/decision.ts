@@ -64,6 +64,10 @@ export interface PromptOutput {
   targetTool: string;
   promptTitle: string;
   promptBody: string;
+  safetyRules?: string[];
+  implementationScope?: string;
+  forbiddenChanges?: string[];
+  expectedReportFormat?: string[];
 }
 
 export interface DecisionRequest {

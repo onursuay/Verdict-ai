@@ -1,4 +1,5 @@
-import { AIAnalysis, DecisionRequest, DecisionResult, FinalVerdict, PromptOutput } from "@/types/decision";
+import { AIAnalysis, DecisionRequest, DecisionResult, FinalVerdict } from "@/types/decision";
+import { generatePromptOutput } from "@/lib/prompt-builder";
 
 const RISKS_BY_TYPE: Record<string, string[]> = {
   Hata: [
@@ -137,26 +138,13 @@ export function generateMockDecision(request: DecisionRequest): DecisionResult {
     confidenceScore: confidenceByPriority(89, request.priority),
   };
 
-  const promptOutput: PromptOutput = {
-    targetTool: "Claude Code",
-    promptTitle: `${request.requestType} — ${request.projectName}`,
-    promptBody: `Sen deneyimli bir yazılım mimarısın. Aşağıdaki talep için detaylı bir uygulama planı oluştur:
-
-**Proje:** ${request.projectName}
-**Talep Tipi:** ${request.requestType}
-**Öncelik:** ${request.priority}
-**Problem:** ${request.problem}
-**Beklenen Çıktı:** ${request.expectedOutput}
-${request.repoRequired ? "**Not:** Repo erişimi gerekli\n" : ""}
-Lütfen şunları kapsa:
-1. Adım adım uygulama planı
-2. Gerekli dosya ve modüller
-3. Potansiyel riskler ve önlemler
-4. Test stratejisi
-5. Tahmini süre
-
-Yanıtını Türkçe olarak, teknik ama anlaşılır biçimde ver.`,
-  };
+  const promptOutput = generatePromptOutput(
+    request,
+    claudeAnalysis,
+    codexAnalysis,
+    finalVerdict,
+    request.attachments ?? []
+  );
 
   return {
     requestId: request.id,

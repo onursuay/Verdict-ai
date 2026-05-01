@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { AIAnalysis, AnalysisSource, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict } from "@/types/decision";
 import { generateMockDecision } from "@/lib/mock-decision";
+import { generatePromptOutput } from "@/lib/prompt-builder";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -429,6 +430,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const promptOutput = generatePromptOutput(
+    enrichedRequest,
+    claudeAnalysis,
+    codexAnalysis,
+    finalVerdict,
+    processedAttachments
+  );
+
   const finalResult: DecisionResult = {
     ...mockResult,
     analyses: mockResult.analyses.map((a) => {
@@ -437,6 +446,7 @@ export async function POST(req: NextRequest) {
       return a;
     }),
     finalVerdict,
+    promptOutput,
     claudeSource,
     codexSource,
     judgeSource,

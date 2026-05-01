@@ -123,7 +123,7 @@ export default function ActionButtons({ result, status, onStatusChange }: Action
               {copied ? "Kopyalandı ✓" : "Kopyala"}
             </button>
           </div>
-          <pre className="p-4 text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+          <pre className="p-4 text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-[520px] overflow-y-auto">
             {result.promptOutput.promptBody}
           </pre>
         </div>
