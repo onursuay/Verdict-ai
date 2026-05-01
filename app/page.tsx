@@ -160,13 +160,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="mt-16 pb-8 text-center text-xs text-gray-400">
-        Verdict AI —{" "}
-        {claudeSource === "live"
-          ? "Claude API aktif · claude_engineer analizi canlı"
-          : "Mock Mod · ANTHROPIC_API_KEY tanımlanmamış"}
-      </footer>
+      <div className="pb-8" />
     </div>
   );
 }
