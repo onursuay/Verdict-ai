@@ -3,13 +3,14 @@
 import { useState } from "react";
 import DecisionRequestForm from "@/components/DecisionRequestForm";
 import DecisionResult from "@/components/DecisionResult";
+import DecisionHistory from "@/components/DecisionHistory";
 import { generateMockDecision } from "@/lib/mock-decision";
 import { AnalysisSource, DecisionRequest, DecisionResult as DecisionResultType } from "@/types/decision";
 
-type ViewState = "form" | "result";
+type ViewState = "new" | "history" | "result";
 
 export default function Home() {
-  const [view, setView] = useState<ViewState>("form");
+  const [view, setView] = useState<ViewState>("new");
   const [isLoading, setIsLoading] = useState(false);
   const [currentRequest, setCurrentRequest] = useState<DecisionRequest | null>(null);
   const [currentResult, setCurrentResult] = useState<DecisionResultType | null>(null);
@@ -29,7 +30,6 @@ export default function Home() {
       const data: DecisionResultType = await res.json();
       setCurrentResult(data);
       setClaudeSource((data.claudeSource as AnalysisSource) ?? "mock");
-      // Use enriched attachments from backend (visionStatus/analysisStatus updated)
       setCurrentRequest(
         data.enrichedAttachments?.length
           ? { ...request, attachments: data.enrichedAttachments }
@@ -47,10 +47,24 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    setView("form");
+    setView("new");
     setCurrentRequest(null);
     setCurrentResult(null);
     setClaudeSource("mock");
+  };
+
+  const handleOpenFromHistory = (request: DecisionRequest, result: DecisionResultType) => {
+    setCurrentRequest(request);
+    setCurrentResult(result);
+    setClaudeSource((result.claudeSource as AnalysisSource) ?? "mock");
+    setView("result");
+  };
+
+  const handleTabClick = (tab: "new" | "history") => {
+    setCurrentRequest(null);
+    setCurrentResult(null);
+    if (tab === "new") setClaudeSource("mock");
+    setView(tab);
   };
 
   return (
@@ -84,7 +98,31 @@ export default function Home() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-        {view === "form" ? (
+        {/* Tabs */}
+        <div className="flex gap-1 mb-8 border-b border-gray-200">
+          <button
+            onClick={() => handleTabClick("new")}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition cursor-pointer ${
+              view === "new"
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Yeni Talep
+          </button>
+          <button
+            onClick={() => handleTabClick("history")}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition cursor-pointer ${
+              view === "history"
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Geçmiş Raporlar
+          </button>
+        </div>
+
+        {view === "new" && (
           <div className="space-y-8">
             {/* Hero */}
             <div className="text-center space-y-3 pt-2 pb-2">
@@ -148,15 +186,18 @@ export default function Home() {
               <DecisionRequestForm onSubmit={handleSubmit} isLoading={isLoading} />
             </div>
           </div>
-        ) : (
-          currentRequest &&
-          currentResult && (
-            <DecisionResult
-              request={currentRequest}
-              result={currentResult}
-              onReset={handleReset}
-            />
-          )
+        )}
+
+        {view === "history" && (
+          <DecisionHistory onOpen={handleOpenFromHistory} />
+        )}
+
+        {view === "result" && currentRequest && currentResult && (
+          <DecisionResult
+            request={currentRequest}
+            result={currentResult}
+            onReset={handleReset}
+          />
         )}
       </main>
 
