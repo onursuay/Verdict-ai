@@ -184,9 +184,20 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         {/* Codex Denetimi */}
         <DecisionCard title="Codex Denetimi" icon="🔍" badge="Kod Denetçisi" badgeColor="violet">
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-1">
               <p className="text-xs text-gray-500 italic">{codex.title}</p>
-              <ConfidenceBadge score={codex.confidenceScore} />
+              <div className="flex items-center gap-1.5">
+                {result.codexSource === "live" ? (
+                  <span className="text-xs font-semibold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">
+                    Canlı Denetçi
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                    Mock Denetçi
+                  </span>
+                )}
+                <ConfidenceBadge score={codex.confidenceScore} />
+              </div>
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">

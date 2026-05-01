@@ -62,6 +62,71 @@ function parseClaudeAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
   }
 }
 
+// ─── OpenAI codex prompt & parser ───────────────────────────────────────────
+
+function buildCodexPrompt(req: DecisionRequest, claude: AIAnalysis): string {
+  return `Sen kıdemli bir kod denetçisi ve ikinci mühendissin. Ana görevin uygulanabilirlik, kod riski, test riski, regression riski, gereksiz refactor riski ve edge-case tespitidir. Kod yazma; yalnızca karar analizi üret.
+
+Aşağıdaki yazılım talebini ve ana mühendis analizini incele, bağımsız bir kod denetimi yap. Sonucu SADECE geçerli JSON formatında ver.
+
+TALEP:
+- Proje: ${req.projectName}
+- Talep Tipi: ${req.requestType}
+- Öncelik: ${req.priority}
+- Problem: ${req.problem}
+- Beklenen Çıktı: ${req.expectedOutput}
+- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}
+
+ANA MÜHENDİS (CLAUDE) ANALİZİ:
+- Özet: ${claude.summary}
+- Güçlü Yönler: ${claude.strengths.join("; ")}
+- Riskler: ${claude.risks.join("; ")}
+- Öneri: ${claude.recommendation}
+
+Ana mühendis analizini birebir kopyalama; kod denetçisi perspektifinden bağımsız değerlendirme yap.
+
+Yanıtın yalnızca aşağıdaki JSON yapısından oluşmalı; başka hiçbir metin ekleme:
+
+{
+  "title": "kısa denetim başlığı (en fazla 60 karakter)",
+  "summary": "kod denetimi özeti (2-3 cümle, Türkçe)",
+  "strengths": ["teknik güçlü yön 1", "teknik güçlü yön 2"],
+  "risks": ["kod/test riski 1", "regression riski 2", "edge-case riski 3"],
+  "objections": ["denetçi itirazı 1", "denetçi itirazı 2"],
+  "recommendation": "kod denetçisi önerisi (Türkçe, net)",
+  "confidenceScore": 78
+}
+
+Kurallar:
+- Tüm değerler Türkçe olacak
+- confidenceScore 0-100 arası tamsayı olacak
+- Kod kalitesi, test ve risk odaklı yanıt ver
+- Sadece JSON döndür`;
+}
+
+function parseCodexAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+    const p = JSON.parse(match[0]);
+    return {
+      role: "codex_reviewer",
+      title: typeof p.title === "string" ? p.title : fallback.title,
+      summary: typeof p.summary === "string" ? p.summary : fallback.summary,
+      strengths: Array.isArray(p.strengths) ? p.strengths.map(String) : fallback.strengths,
+      risks: Array.isArray(p.risks) ? p.risks.map(String) : fallback.risks,
+      objections: Array.isArray(p.objections) ? p.objections.map(String) : fallback.objections,
+      recommendation: typeof p.recommendation === "string" ? p.recommendation : fallback.recommendation,
+      confidenceScore:
+        typeof p.confidenceScore === "number"
+          ? Math.max(0, Math.min(100, Math.round(p.confidenceScore)))
+          : fallback.confidenceScore,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 // ─── OpenAI judge prompt & parser ────────────────────────────────────────────
 
 function buildJudgePrompt(
@@ -176,26 +241,41 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Step 2: ChatGPT hakem final verdict (Claude analizini bağlam olarak alır)
-  let finalVerdict = mockResult.finalVerdict;
-  let judgeSource: AnalysisSource = "mock";
+  // Step 2: Codex kod denetçisi analizi (OpenAI, Claude bağlamıyla)
+  let codexAnalysis = mockCodexAnalysis;
+  let codexSource: AnalysisSource = "mock";
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
       const openai = new OpenAI({ apiKey: openaiKey });
-      const completion = await openai.chat.completions.create({
+      const codexCompletion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: buildJudgePrompt(request, claudeAnalysis, mockCodexAnalysis),
-          },
-        ],
+        messages: [{ role: "user", content: buildCodexPrompt(request, claudeAnalysis) }],
       });
-      const text = completion.choices[0]?.message?.content ?? "";
-      finalVerdict = parseJudgeVerdict(text, mockResult.finalVerdict);
+      const codexText = codexCompletion.choices[0]?.message?.content ?? "";
+      codexAnalysis = parseCodexAnalysis(codexText, mockCodexAnalysis);
+      codexSource = "live";
+    } catch {
+      // mock kalır
+    }
+  }
+
+  // Step 3: ChatGPT hakem final verdict (Claude + Codex analizlerini bağlam olarak alır)
+  let finalVerdict = mockResult.finalVerdict;
+  let judgeSource: AnalysisSource = "mock";
+
+  if (openaiKey) {
+    try {
+      const openai = new OpenAI({ apiKey: openaiKey });
+      const judgeCompletion = await openai.chat.completions.create({
+        model: OPENAI_MODEL,
+        max_tokens: 1024,
+        messages: [{ role: "user", content: buildJudgePrompt(request, claudeAnalysis, codexAnalysis) }],
+      });
+      const judgeText = judgeCompletion.choices[0]?.message?.content ?? "";
+      finalVerdict = parseJudgeVerdict(judgeText, mockResult.finalVerdict);
       judgeSource = "live";
     } catch {
       // mock kalır
@@ -204,11 +284,14 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ...mockResult,
-    analyses: mockResult.analyses.map((a) =>
-      a.role === "claude_engineer" ? claudeAnalysis : a
-    ),
+    analyses: mockResult.analyses.map((a) => {
+      if (a.role === "claude_engineer") return claudeAnalysis;
+      if (a.role === "codex_reviewer") return codexAnalysis;
+      return a;
+    }),
     finalVerdict,
     claudeSource,
+    codexSource,
     judgeSource,
   });
 }

@@ -74,5 +74,6 @@ export interface DecisionResult {
   promptOutput: PromptOutput;
   createdAt: Date;
   claudeSource?: AnalysisSource;
+  codexSource?: AnalysisSource;
   judgeSource?: AnalysisSource;
 }
