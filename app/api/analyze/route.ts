@@ -37,7 +37,7 @@ Kurallar:
 - Tüm değerler Türkçe olacak
 - confidenceScore 0-100 arası tamsayı olacak
 - Teknik, somut ve kısa yanıt ver
-- Sadece JSON döndür`;
+- Sadece JSON döndür${req.attachments?.length ? `\n\nREFERANS DOSYALAR:\nKullanıcı aşağıdaki referans dosyaları ekledi. Bu aşamada içerik parse edilmemiş olabilir; dosya adları/tipleri bağlam sinyali olarak değerlendirilmelidir:\n${req.attachments.map(a => `- ${a.name} (${a.type}, ${(a.size/1024).toFixed(0)} KB)`).join("\n")}` : ""}`;
 }
 
 function parseClaudeAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
@@ -102,7 +102,7 @@ Kurallar:
 - Tüm değerler Türkçe olacak
 - confidenceScore 0-100 arası tamsayı olacak
 - Kod kalitesi, test ve risk odaklı yanıt ver
-- Sadece JSON döndür`;
+- Sadece JSON döndür${req.attachments?.length ? `\n\nREFERANS DOSYALAR:\nKullanıcı aşağıdaki referans dosyaları ekledi. Bu aşamada içerik parse edilmemiş olabilir; dosya adları/tipleri bağlam sinyali olarak değerlendirilmelidir:\n${req.attachments.map(a => `- ${a.name} (${a.type}, ${(a.size/1024).toFixed(0)} KB)`).join("\n")}` : ""}`;
 }
 
 function parseCodexAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
@@ -174,7 +174,7 @@ Kurallar:
 - Tüm değerler Türkçe olacak
 - confidenceScore 0-100 arası tamsayı olacak
 - Hakem olarak bağımsız ve net karar ver
-- Sadece JSON döndür`;
+- Sadece JSON döndür${req.attachments?.length ? `\n\nREFERANS DOSYALAR:\nKullanıcı aşağıdaki referans dosyaları ekledi. Bu aşamada içerik parse edilmemiş olabilir; dosya adları/tipleri bağlam sinyali olarak değerlendirilmelidir:\n${req.attachments.map(a => `- ${a.name} (${a.type}, ${(a.size/1024).toFixed(0)} KB)`).join("\n")}` : ""}`;
 }
 
 function parseJudgeVerdict(text: string, fallback: FinalVerdict): FinalVerdict {
@@ -298,32 +298,39 @@ export async function POST(req: NextRequest) {
 
   // Step 4: Supabase kayıt (env yoksa veya hata olursa sessizce atla)
   let saved = false;
+  let recordId: string | undefined;
   const supabase = getSupabaseServer();
   if (supabase) {
     try {
-      const { error } = await supabase.from("decision_records").insert({
-        project_name: request.projectName,
-        request_type: request.requestType,
-        priority: request.priority,
-        problem: request.problem,
-        expected_output: request.expectedOutput,
-        repo_required: request.repoRequired,
-        status: request.status,
-        claude_source: claudeSource,
-        codex_source: codexSource,
-        judge_source: judgeSource,
-        request_json: request,
-        result_json: finalResult,
-      });
+      const { data, error } = await supabase
+        .from("decision_records")
+        .insert({
+          project_name: request.projectName,
+          request_type: request.requestType,
+          priority: request.priority,
+          problem: request.problem,
+          expected_output: request.expectedOutput,
+          repo_required: request.repoRequired,
+          status: request.status,
+          claude_source: claudeSource,
+          codex_source: codexSource,
+          judge_source: judgeSource,
+          request_json: request,
+          result_json: finalResult,
+          attachments_json: request.attachments ?? [],
+        })
+        .select("id")
+        .single();
       if (error) {
         console.warn("[verdict-ai] Supabase kayıt hatası:", error.message);
       } else {
         saved = true;
+        recordId = (data as { id: string }).id;
       }
     } catch (err) {
       console.warn("[verdict-ai] Supabase erişim hatası:", err instanceof Error ? err.message : "bilinmeyen hata");
     }
   }
 
-  return NextResponse.json({ ...finalResult, saved });
+  return NextResponse.json({ ...finalResult, saved, recordId });
 }

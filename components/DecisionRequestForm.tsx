@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { DecisionRequest, ExpectedOutput, Priority, RequestType } from "@/types/decision";
+import { useState, useRef } from "react";
+import { DecisionAttachment, DecisionRequest, ExpectedOutput, Priority, RequestType } from "@/types/decision";
 
 interface DecisionRequestFormProps {
   onSubmit: (request: DecisionRequest) => void;
@@ -48,6 +48,30 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [priority, setPriority] = useState<Priority>("Orta");
   const [problem, setProblem] = useState("");
   const [repoRequired, setRepoRequired] = useState(false);
+  const [attachments, setAttachments] = useState<DecisionAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const ALLOWED_TYPES = ["image/png","image/jpeg","image/webp","application/pdf","text/plain","application/json","text/markdown"];
+  const MAX_FILES = 5;
+  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+
+  const handleFiles = (files: File[]) => {
+    const valid = files.filter(f => ALLOWED_TYPES.includes(f.type) && f.size <= MAX_SIZE);
+    setAttachments(prev => {
+      const combined = [...prev, ...valid.map(f => ({
+        id: `att-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        createdAt: new Date(),
+      }))];
+      return combined.slice(0, MAX_FILES);
+    });
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +87,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       repoRequired,
       createdAt: new Date(),
       status: "analyzing",
+      attachments,
     };
 
     onSubmit(request);
@@ -148,6 +173,58 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           style={{ minHeight: "160px" }}
           className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition resize-none overflow-hidden"
         />
+      </div>
+
+      {/* Referans Dosyalar */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          Referans Dosyalar
+          <span className="ml-2 text-xs font-normal text-gray-400">İsteğe bağlı · En fazla 5 dosya · Dosya başı 10 MB</span>
+        </label>
+        <p className="text-xs text-gray-400 mb-3">
+          Sorunu anlatan ekran görüntüsü, PDF, doküman veya görselleri ekleyin. AI analiz sırasında referans olarak kullanılır.
+        </p>
+
+        {/* Drop Zone */}
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleFiles(Array.from(e.dataTransfer.files));
+          }}
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition"
+        >
+          <p className="text-sm text-gray-500">Dosyaları buraya sürükleyin veya <span className="text-indigo-600 font-medium">seçmek için tıklayın</span></p>
+          <p className="text-xs text-gray-400 mt-1">PNG, JPG, WebP, PDF, TXT, JSON, MD</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,application/json,text/markdown"
+            className="hidden"
+            onChange={(e) => handleFiles(Array.from(e.target.files ?? []))}
+          />
+        </div>
+
+        {/* File List */}
+        {attachments.length > 0 && (
+          <ul className="mt-3 space-y-2">
+            {attachments.map((att) => (
+              <li key={att.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+                <span className="text-gray-400 flex-shrink-0">📎</span>
+                <span className="truncate text-gray-700 font-medium flex-1">{att.name}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{att.type.split("/")[1]?.toUpperCase()}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{(att.size / 1024).toFixed(0)} KB</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); removeAttachment(att.id); }}
+                  className="text-gray-400 hover:text-red-500 transition flex-shrink-0 cursor-pointer"
+                >✕</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Beklenen Çıktı — otomatik */}

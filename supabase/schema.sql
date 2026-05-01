@@ -17,3 +17,7 @@ create table if not exists decision_records (
   result_json    jsonb       not null,
   created_at     timestamptz not null default now()
 );
+
+-- Migration: attachments_json alanı ekle (tablo zaten varsa)
+alter table decision_records
+  add column if not exists attachments_json jsonb;

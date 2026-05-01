@@ -1,3 +1,11 @@
+export interface DecisionAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  createdAt: Date;
+}
+
 export type RequestType =
   | "Hata"
   | "Yeni Özellik"
@@ -63,6 +71,7 @@ export interface DecisionRequest {
   repoRequired: boolean;
   createdAt: Date;
   status: DecisionStatus;
+  attachments?: DecisionAttachment[];
 }
 
 export type AnalysisSource = "mock" | "live";
@@ -77,4 +86,5 @@ export interface DecisionResult {
   codexSource?: AnalysisSource;
   judgeSource?: AnalysisSource;
   saved?: boolean;
+  recordId?: string;
 }
