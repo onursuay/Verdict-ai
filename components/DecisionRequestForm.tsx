@@ -52,20 +52,50 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const ALLOWED_TYPES = ["image/png","image/jpeg","image/webp","application/pdf","text/plain","application/json","text/markdown"];
+  const TEXT_TYPES = ["text/plain", "application/json", "text/markdown"];
   const MAX_FILES = 5;
   const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+  const MAX_TEXT = 15000;
 
   const handleFiles = (files: File[]) => {
     const valid = files.filter(f => ALLOWED_TYPES.includes(f.type) && f.size <= MAX_SIZE);
-    setAttachments(prev => {
-      const combined = [...prev, ...valid.map(f => ({
+
+    valid.forEach(f => {
+      const base: DecisionAttachment = {
         id: `att-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         name: f.name,
         type: f.type,
         size: f.size,
         createdAt: new Date(),
-      }))];
-      return combined.slice(0, MAX_FILES);
+      };
+
+      const addIfRoom = (att: DecisionAttachment) =>
+        setAttachments(prev => prev.length >= MAX_FILES ? prev : [...prev, att]);
+
+      if (TEXT_TYPES.includes(f.type)) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const text = (e.target?.result as string ?? "").slice(0, MAX_TEXT);
+          addIfRoom({ ...base, contentText: text, analysisStatus: "content_extracted" });
+        };
+        reader.onerror = () =>
+          addIfRoom({ ...base, analysisStatus: "error", contentSummary: "Dosya okunamadı." });
+        reader.readAsText(f);
+      } else if (f.type.startsWith("image/")) {
+        addIfRoom({
+          ...base,
+          analysisStatus: "metadata_only",
+          contentSummary: "Görsel dosya eklendi; bu fazda görsel içeriği okunmadı.",
+        });
+      } else if (f.type === "application/pdf") {
+        addIfRoom({
+          ...base,
+          analysisStatus: "metadata_only",
+          contentSummary: "PDF dosyası eklendi; bu fazda PDF içeriği okunmadı.",
+        });
+      } else {
+        addIfRoom({ ...base, analysisStatus: "unsupported" });
+      }
     });
   };
 

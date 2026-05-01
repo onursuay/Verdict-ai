@@ -4,6 +4,9 @@ export interface DecisionAttachment {
   type: string;
   size: number;
   createdAt: Date;
+  contentText?: string;
+  analysisStatus?: "metadata_only" | "content_extracted" | "unsupported" | "too_large" | "error";
+  contentSummary?: string;
 }
 
 export type RequestType =

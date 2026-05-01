@@ -17,6 +17,13 @@ const PRIORITY_BADGE: Record<string, { label: string; className: string }> = {
   Düşük: { label: "DÜŞÜK", className: "bg-green-100 text-green-700 border border-green-200" },
 };
 
+function splitExecutionPlan(plan: string[]): string[] {
+  if (plan.length === 1 && plan[0].includes("→")) {
+    return plan[0].split("→").map(s => s.trim()).filter(Boolean);
+  }
+  return plan;
+}
+
 function ConfidenceBadge({ score }: { score: number }) {
   const color =
     score >= 85 ? "bg-green-100 text-green-700" :
@@ -56,15 +63,29 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) return;
     w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Verdict AI Raporu — ${request.projectName}</title><style>
+    *{box-sizing:border-box}
     body{font-family:system-ui,sans-serif;max-width:780px;margin:40px auto;padding:0 24px;color:#111827;font-size:14px;line-height:1.6}
-    h4{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin:0 0 8px}
-    section{margin-bottom:20px} p,li{color:#374151;margin:4px 0}
-    ol,ul{padding-left:0;list-style:none}
+    h4{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin:0 0 10px}
+    section{margin-bottom:24px;page-break-inside:avoid}
+    p{color:#374151;margin:4px 0}
+    li{color:#374151;margin:0}
+    ol,ul{padding-left:0;list-style:none;margin:0}
+    .flex{display:flex}.items-start{align-items:flex-start}.gap-2{gap:8px}.leading-relaxed{line-height:1.6}
+    .step-num{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:#e0e7ff;color:#4338ca;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-top:2px}
+    .space-y-1-5>*+*{margin-top:6px}
     .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;margin-right:6px}
     .live{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
     .mock{background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb}
-    hr{border:none;border-top:1px solid #f3f4f6;margin:16px 0}
-    @media print{body{margin:0}}
+    .border-t{border-top:1px solid #f3f4f6;margin:16px 0}
+    .att-item{border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin:6px 0}
+    .att-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+    .att-name{font-weight:600;color:#1f2937}
+    .att-meta{color:#9ca3af}
+    .att-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid #e5e7eb;margin-left:auto}
+    .att-note{color:#9ca3af;font-style:italic;font-size:12px;margin-top:6px}
+    .att-content{background:#f9fafb;border-radius:4px;padding:8px;font-family:monospace;font-size:11px;color:#6b7280;margin-top:6px;word-break:break-word;white-space:pre-wrap}
+    .no-print{display:none!important}
+    @media print{body{margin:0;padding:0 12px}section{page-break-inside:avoid}.no-print{display:none!important}}
   </style></head><body>${reportEl.innerHTML}</body></html>`);
     w.document.close();
     w.focus();
@@ -162,7 +183,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         {/* Uygulanacak Yol */}
         <DecisionCard title="Uygulanacak Yol" icon="🗺️" badge="Onaylı" badgeColor="green">
           <ol className="space-y-2">
-            {result.finalVerdict.executionPlan.map((step, i) => (
+            {splitExecutionPlan(result.finalVerdict.executionPlan).map((step, i) => (
               <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
                 <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center mt-0.5">
                   {i + 1}
@@ -304,7 +325,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
           </div>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-3 py-1.5 rounded-lg transition cursor-pointer"
+            className="no-print flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-3 py-1.5 rounded-lg transition cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -374,11 +395,11 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
           {/* Uygulanacak Yol */}
           <section>
             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Uygulanacak Yol</h4>
-            <ol className="space-y-1 list-none">
-              {result.finalVerdict.executionPlan.map((step, i) => (
+            <ol className="space-y-1.5 list-none">
+              {splitExecutionPlan(result.finalVerdict.executionPlan).map((step, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center mt-0.5">{i+1}</span>
-                  {step}
+                  <span className="leading-relaxed">{step}</span>
                 </li>
               ))}
             </ol>
@@ -410,12 +431,40 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
               <div className="border-t border-gray-100" />
               <section>
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Eklenen Referans Dosyalar</h4>
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {request.attachments.map((att) => (
-                    <li key={att.id} className="flex items-center gap-2 text-xs text-gray-600">
-                      <span className="text-gray-400">📎</span>
-                      <span className="font-medium">{att.name}</span>
-                      <span className="text-gray-400">{att.type.split("/")[1]?.toUpperCase()} · {(att.size/1024).toFixed(0)} KB</span>
+                    <li key={att.id} className="text-xs text-gray-600 border border-gray-100 rounded-lg p-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-gray-400">📎</span>
+                        <span className="font-medium text-gray-800">{att.name}</span>
+                        <span className="text-gray-400">{att.type.split("/")[1]?.toUpperCase()} · {(att.size/1024).toFixed(0)} KB</span>
+                        <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full border ${
+                          att.analysisStatus === "content_extracted"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : att.analysisStatus === "metadata_only"
+                            ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                            : att.analysisStatus === "error"
+                            ? "bg-red-50 text-red-600 border-red-200"
+                            : "bg-gray-50 text-gray-500 border-gray-200"
+                        }`}>
+                          {att.analysisStatus === "content_extracted" ? "İçerik analiz edildi"
+                            : att.analysisStatus === "metadata_only" ? "Sadece metadata"
+                            : att.analysisStatus === "too_large" ? "Çok büyük"
+                            : att.analysisStatus === "unsupported" ? "Desteklenmiyor"
+                            : att.analysisStatus === "error" ? "Hata"
+                            : "Metadata"}
+                        </span>
+                      </div>
+                      {att.analysisStatus === "content_extracted" && att.contentText && (
+                        <p className="mt-2 text-gray-500 bg-gray-50 rounded p-2 font-mono text-[11px] leading-relaxed break-all">
+                          {att.contentText.slice(0, 300)}{att.contentText.length > 300 ? "…" : ""}
+                        </p>
+                      )}
+                      {att.analysisStatus === "metadata_only" && (
+                        <p className="mt-1.5 text-gray-400 italic">
+                          Bu dosyanın içeriği henüz okunmadı; sadece dosya bilgisi referans olarak kullanıldı.
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

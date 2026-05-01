@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { AIAnalysis, AnalysisSource, DecisionRequest, DecisionResult, FinalVerdict } from "@/types/decision";
+import { AIAnalysis, AnalysisSource, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict } from "@/types/decision";
 import { generateMockDecision } from "@/lib/mock-decision";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
@@ -12,6 +12,19 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
 
 function stripCodeFences(text: string): string {
   return text.replace(/^```[\w]*\n?/gm, "").replace(/^```$/gm, "").trim();
+}
+
+function buildAttachmentContext(attachments?: DecisionAttachment[]): string {
+  if (!attachments?.length) return "";
+  const lines = attachments.map(a => {
+    if (a.analysisStatus === "content_extracted" && a.contentText) {
+      return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [content_extracted]\n  İçerik:\n${a.contentText}`;
+    }
+    const status = a.analysisStatus ?? "metadata_only";
+    const summary = a.contentSummary ? ` — ${a.contentSummary}` : "";
+    return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [${status}]${summary}`;
+  });
+  return `\n\nREFERANS DOSYALAR:\nÖnemli: content_extracted durumundaki dosyaların içeriğini analizde aktif olarak kullan. metadata_only durumundaki dosyaların içeriğini görmüş gibi davranma; yalnızca dosyanın varlığını bağlam sinyali olarak değerlendir.\n\n${lines.join("\n\n")}`;
 }
 
 // ─── Claude prompt & parser ──────────────────────────────────────────────────
@@ -43,7 +56,7 @@ Kurallar:
 - Tüm değerler Türkçe olacak
 - confidenceScore 0-100 arası tamsayı olacak
 - Teknik, somut ve kısa yanıt ver
-- Sadece JSON döndür${req.attachments?.length ? `\n\nREFERANS DOSYALAR:\nKullanıcı aşağıdaki referans dosyaları ekledi. Bu aşamada içerik parse edilmemiş olabilir; dosya adları/tipleri bağlam sinyali olarak değerlendirilmelidir:\n${req.attachments.map(a => `- ${a.name} (${a.type}, ${(a.size/1024).toFixed(0)} KB)`).join("\n")}` : ""}`;
+- Sadece JSON döndür${buildAttachmentContext(req.attachments)}`;
 }
 
 function parseClaudeAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
@@ -108,7 +121,7 @@ Kurallar:
 - Tüm değerler Türkçe olacak
 - confidenceScore 0-100 arası tamsayı olacak
 - Kod kalitesi, test ve risk odaklı yanıt ver
-- Sadece JSON döndür${req.attachments?.length ? `\n\nREFERANS DOSYALAR:\nKullanıcı aşağıdaki referans dosyaları ekledi. Bu aşamada içerik parse edilmemiş olabilir; dosya adları/tipleri bağlam sinyali olarak değerlendirilmelidir:\n${req.attachments.map(a => `- ${a.name} (${a.type}, ${(a.size/1024).toFixed(0)} KB)`).join("\n")}` : ""}`;
+- Sadece JSON döndür${buildAttachmentContext(req.attachments)}`;
 }
 
 function parseCodexAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
@@ -180,7 +193,7 @@ Kurallar:
 - Tüm değerler Türkçe olacak
 - confidenceScore 0-100 arası tamsayı olacak
 - Hakem olarak bağımsız ve net karar ver
-- Sadece JSON döndür${req.attachments?.length ? `\n\nREFERANS DOSYALAR:\nKullanıcı aşağıdaki referans dosyaları ekledi. Bu aşamada içerik parse edilmemiş olabilir; dosya adları/tipleri bağlam sinyali olarak değerlendirilmelidir:\n${req.attachments.map(a => `- ${a.name} (${a.type}, ${(a.size/1024).toFixed(0)} KB)`).join("\n")}` : ""}`;
+- Sadece JSON döndür${buildAttachmentContext(req.attachments)}`;
 }
 
 function parseJudgeVerdict(text: string, fallback: FinalVerdict): FinalVerdict {
