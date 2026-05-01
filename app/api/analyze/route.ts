@@ -5,8 +5,14 @@ import { AIAnalysis, AnalysisSource, DecisionRequest, DecisionResult, FinalVerdi
 import { generateMockDecision } from "@/lib/mock-decision";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
+export const runtime = "nodejs";
+
 const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.1";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
+
+function stripCodeFences(text: string): string {
+  return text.replace(/^```[\w]*\n?/gm, "").replace(/^```$/gm, "").trim();
+}
 
 // ─── Claude prompt & parser ──────────────────────────────────────────────────
 
@@ -42,7 +48,7 @@ Kurallar:
 
 function parseClaudeAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
   try {
-    const match = text.match(/\{[\s\S]*\}/);
+    const match = stripCodeFences(text).match(/\{[\s\S]*\}/);
     if (!match) return fallback;
     const p = JSON.parse(match[0]);
     return {
@@ -107,7 +113,7 @@ Kurallar:
 
 function parseCodexAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
   try {
-    const match = text.match(/\{[\s\S]*\}/);
+    const match = stripCodeFences(text).match(/\{[\s\S]*\}/);
     if (!match) return fallback;
     const p = JSON.parse(match[0]);
     return {
@@ -179,7 +185,7 @@ Kurallar:
 
 function parseJudgeVerdict(text: string, fallback: FinalVerdict): FinalVerdict {
   try {
-    const match = text.match(/\{[\s\S]*\}/);
+    const match = stripCodeFences(text).match(/\{[\s\S]*\}/);
     if (!match) return fallback;
     const p = JSON.parse(match[0]);
 
@@ -217,6 +223,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Geçersiz istek gövdesi" }, { status: 400 });
   }
 
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  console.log("[verdict-ai] analyze", {
+    hasAnthropicKey: !!anthropicKey,
+    hasOpenAIKey: !!openaiKey,
+    openaiModel: OPENAI_MODEL,
+    claudeModel: CLAUDE_MODEL,
+  });
+
   const mockResult = generateMockDecision(request);
   const mockClaudeAnalysis = mockResult.analyses.find((a) => a.role === "claude_engineer")!;
   const mockCodexAnalysis = mockResult.analyses.find((a) => a.role === "codex_reviewer")!;
@@ -225,7 +240,6 @@ export async function POST(req: NextRequest) {
   let claudeAnalysis = mockClaudeAnalysis;
   let claudeSource: AnalysisSource = "mock";
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (anthropicKey) {
     try {
       const anthropic = new Anthropic({ apiKey: anthropicKey });
@@ -237,8 +251,8 @@ export async function POST(req: NextRequest) {
       const text = message.content[0].type === "text" ? message.content[0].text : "";
       claudeAnalysis = parseClaudeAnalysis(text, mockClaudeAnalysis);
       claudeSource = "live";
-    } catch {
-      // mock kalır
+    } catch (err) {
+      console.warn("[verdict-ai] Claude error:", err instanceof Error ? err.message : "unknown");
     }
   }
 
@@ -246,7 +260,6 @@ export async function POST(req: NextRequest) {
   let codexAnalysis = mockCodexAnalysis;
   let codexSource: AnalysisSource = "mock";
 
-  const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
       const openai = new OpenAI({ apiKey: openaiKey });
@@ -258,8 +271,8 @@ export async function POST(req: NextRequest) {
       const codexText = codexCompletion.choices[0]?.message?.content ?? "";
       codexAnalysis = parseCodexAnalysis(codexText, mockCodexAnalysis);
       codexSource = "live";
-    } catch {
-      // mock kalır
+    } catch (err) {
+      console.warn("[verdict-ai] Codex error:", err instanceof Error ? err.message : "unknown");
     }
   }
 
@@ -278,8 +291,8 @@ export async function POST(req: NextRequest) {
       const judgeText = judgeCompletion.choices[0]?.message?.content ?? "";
       finalVerdict = parseJudgeVerdict(judgeText, mockResult.finalVerdict);
       judgeSource = "live";
-    } catch {
-      // mock kalır
+    } catch (err) {
+      console.warn("[verdict-ai] Judge error:", err instanceof Error ? err.message : "unknown");
     }
   }
 
