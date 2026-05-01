@@ -50,6 +50,15 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
               {request.requestType}
             </span>
+            {result.saved === true ? (
+              <span className="text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+                Kayıt alındı
+              </span>
+            ) : (
+              <span className="text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
+                Kayıt yapılmadı
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-500 mt-1">
             {request.createdAt.toLocaleString("tr-TR", {

@@ -76,4 +76,5 @@ export interface DecisionResult {
   claudeSource?: AnalysisSource;
   codexSource?: AnalysisSource;
   judgeSource?: AnalysisSource;
+  saved?: boolean;
 }

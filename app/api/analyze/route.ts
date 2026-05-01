@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { AIAnalysis, AnalysisSource, DecisionRequest, FinalVerdict } from "@/types/decision";
+import { AIAnalysis, AnalysisSource, DecisionRequest, DecisionResult, FinalVerdict } from "@/types/decision";
 import { generateMockDecision } from "@/lib/mock-decision";
+import { getSupabaseServer } from "@/lib/supabase-server";
 
 const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.1";
@@ -282,7 +283,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({
+  const finalResult: DecisionResult = {
     ...mockResult,
     analyses: mockResult.analyses.map((a) => {
       if (a.role === "claude_engineer") return claudeAnalysis;
@@ -293,5 +294,36 @@ export async function POST(req: NextRequest) {
     claudeSource,
     codexSource,
     judgeSource,
-  });
+  };
+
+  // Step 4: Supabase kayıt (env yoksa veya hata olursa sessizce atla)
+  let saved = false;
+  const supabase = getSupabaseServer();
+  if (supabase) {
+    try {
+      const { error } = await supabase.from("decision_records").insert({
+        project_name: request.projectName,
+        request_type: request.requestType,
+        priority: request.priority,
+        problem: request.problem,
+        expected_output: request.expectedOutput,
+        repo_required: request.repoRequired,
+        status: request.status,
+        claude_source: claudeSource,
+        codex_source: codexSource,
+        judge_source: judgeSource,
+        request_json: request,
+        result_json: finalResult,
+      });
+      if (error) {
+        console.warn("[verdict-ai] Supabase kayıt hatası:", error.message);
+      } else {
+        saved = true;
+      }
+    } catch (err) {
+      console.warn("[verdict-ai] Supabase erişim hatası:", err instanceof Error ? err.message : "bilinmeyen hata");
+    }
+  }
+
+  return NextResponse.json({ ...finalResult, saved });
 }
