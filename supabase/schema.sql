@@ -21,3 +21,20 @@ create table if not exists decision_records (
 -- Migration: attachments_json alanı ekle (tablo zaten varsa)
 alter table decision_records
   add column if not exists attachments_json jsonb;
+
+-- Migration: implementation_tasks tablosu
+create table if not exists implementation_tasks (
+  id                  uuid        primary key default gen_random_uuid(),
+  decision_record_id  uuid        references decision_records(id) on delete set null,
+  target_tool         text        not null default 'Claude Code',
+  status              text        not null default 'queued',
+  prompt_title        text,
+  prompt_body         text,
+  result_summary      text,
+  result_json         jsonb,
+  error_message       text,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+
+-- Status değerleri: queued | sent | running | completed | failed | review_required

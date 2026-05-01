@@ -100,11 +100,18 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
       createdAt: new Date(record.request_json.createdAt),
       attachments: hydrateAttachments(record.attachments_json ?? record.request_json.attachments),
     };
+    type RawFollowUp = { id: string; question: string; answer: string; createdAt: string };
+    const rawFollowUps = (record.result_json.followUps ?? []) as unknown as RawFollowUp[];
+    const followUps = rawFollowUps.map((fu) => ({
+      ...fu,
+      createdAt: new Date(fu.createdAt),
+    }));
     const result: DecisionResult = {
       ...record.result_json,
       createdAt: new Date(record.result_json.createdAt),
       recordId: record.id,
       saved: true,
+      followUps,
     };
     onOpen(request, result);
   };

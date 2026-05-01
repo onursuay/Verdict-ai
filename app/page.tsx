@@ -68,28 +68,30 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fc]">
+    <div className="relative min-h-screen overflow-hidden bg-[#030712] text-slate-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.18),transparent_34%),radial-gradient(circle_at_85%_12%,rgba(16,185,129,0.12),transparent_28%),linear-gradient(180deg,#03111f_0%,#030712_42%,#020617_100%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-[42rem] -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
       {/* Navbar */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+      <header className="sticky top-0 z-10 border-b border-emerald-300/10 bg-[#030712]/85 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">AI</span>
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-300 via-teal-400 to-cyan-400 flex items-center justify-center shadow-[0_0_28px_rgba(45,212,191,0.28)]">
+              <span className="text-slate-950 text-xs font-black">AI</span>
             </div>
-            <span className="font-bold text-gray-900 text-sm tracking-tight">
+            <span className="font-bold text-slate-50 text-sm tracking-tight">
               Verdict AI
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+            <span className="text-xs text-slate-300 bg-white/[0.04] border border-white/10 px-2.5 py-1 rounded-full">
               MVP v0.1
             </span>
             {claudeSource === "live" ? (
-              <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+              <span className="text-xs text-emerald-100 bg-emerald-400/10 border border-emerald-300/25 px-2.5 py-1 rounded-full shadow-[0_0_22px_rgba(16,185,129,0.12)]">
                 Claude Canlı
               </span>
             ) : (
-              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+              <span className="text-xs text-amber-200 bg-amber-400/10 border border-amber-300/20 px-2.5 py-1 rounded-full">
                 Mock Mod
               </span>
             )}
@@ -97,15 +99,15 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
+      <main className="relative z-[1] max-w-4xl mx-auto px-4 sm:px-6 py-10">
         {/* Tabs */}
-        <div className="flex gap-1 mb-8 border-b border-gray-200">
+        <div className="flex gap-1 mb-8 border-b border-white/10">
           <button
             onClick={() => handleTabClick("new")}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition cursor-pointer ${
               view === "new"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-emerald-300 text-emerald-200"
+                : "border-transparent text-slate-500 hover:text-slate-200"
             }`}
           >
             Yeni Talep
@@ -114,8 +116,8 @@ export default function Home() {
             onClick={() => handleTabClick("history")}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition cursor-pointer ${
               view === "history"
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-emerald-300 text-emerald-200"
+                : "border-transparent text-slate-500 hover:text-slate-200"
             }`}
           >
             Geçmiş Raporlar
@@ -126,14 +128,14 @@ export default function Home() {
           <div className="space-y-8">
             {/* Hero */}
             <div className="text-center space-y-3 pt-2 pb-2">
-              <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-semibold px-3 py-1.5 rounded-full">
+              <div className="inline-flex items-center gap-2 bg-emerald-400/10 border border-emerald-300/20 text-emerald-200 text-xs font-semibold px-3 py-1.5 rounded-full shadow-[0_0_26px_rgba(45,212,191,0.12)]">
                 <span>🤖</span>
                 Çoklu AI · Hakem Sistemi
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-200 via-teal-200 to-cyan-200 tracking-tight">
                 Verdict AI
               </h1>
-              <p className="text-gray-500 text-base max-w-md mx-auto">
+              <p className="text-slate-400 text-base max-w-md mx-auto">
                 Tek input. Çoklu yapay zekâ analizi. Tek nihai karar.
                 <br />
                 Claude · Codex · ChatGPT bir arada.
@@ -147,27 +149,27 @@ export default function Home() {
                   name: "Claude Code",
                   role: "Ana Mühendis",
                   icon: "🤖",
-                  color: "bg-indigo-50 border-indigo-100 text-indigo-700",
+                  color: "bg-cyan-400/10 border-cyan-300/15 text-cyan-100",
                   desc: "Teknik analiz & uygulanabilirlik",
                 },
                 {
                   name: "Codex",
                   role: "Kod Denetçisi",
                   icon: "🔍",
-                  color: "bg-violet-50 border-violet-100 text-violet-700",
+                  color: "bg-violet-400/10 border-violet-300/15 text-violet-100",
                   desc: "Kod & test risk değerlendirmesi",
                 },
                 {
                   name: "ChatGPT",
                   role: "Hakem",
                   icon: "🏆",
-                  color: "bg-green-50 border-green-100 text-green-700",
+                  color: "bg-emerald-400/10 border-emerald-300/15 text-emerald-100",
                   desc: "Final karar & yol haritası",
                 },
               ].map((ai) => (
                 <div
                   key={ai.name}
-                  className={`rounded-xl border p-3 text-center ${ai.color}`}
+                  className={`rounded-xl border p-3 text-center shadow-[0_18px_40px_rgba(0,0,0,0.20)] backdrop-blur ${ai.color}`}
                 >
                   <div className="text-xl mb-1">{ai.icon}</div>
                   <div className="font-semibold text-xs">{ai.name}</div>
@@ -178,8 +180,8 @@ export default function Home() {
             </div>
 
             {/* Form */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
-              <h2 className="text-base font-semibold text-gray-800 mb-6 flex items-center gap-2">
+            <div className="bg-[#08111f]/90 rounded-2xl border border-emerald-300/10 shadow-[0_24px_70px_rgba(0,0,0,0.34)] p-6 sm:p-8">
+              <h2 className="text-base font-semibold text-slate-100 mb-6 flex items-center gap-2">
                 <span>📋</span>
                 Yeni Karar Talebi
               </h2>

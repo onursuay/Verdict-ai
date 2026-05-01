@@ -3,7 +3,11 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
-const ALLOWED_STATUSES = ["approved", "rejected", "observation", "prompt_generated"] as const;
+const ALLOWED_STATUSES = [
+  "approved", "rejected", "observation", "prompt_generated",
+  "implementation_queued", "implementation_running",
+  "implementation_completed", "implementation_failed", "review_required",
+] as const;
 type AllowedStatus = (typeof ALLOWED_STATUSES)[number];
 
 export async function DELETE(

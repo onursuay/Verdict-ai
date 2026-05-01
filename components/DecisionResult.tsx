@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { DecisionRequest, DecisionResult as DecisionResultType, DecisionStatus } from "@/types/decision";
+import {
+  DecisionFollowUp,
+  DecisionRequest,
+  DecisionResult as DecisionResultType,
+  DecisionStatus,
+  ImplementationTaskInfo,
+} from "@/types/decision";
 import DecisionCard from "./DecisionCard";
 import ActionButtons from "./ActionButtons";
 
@@ -36,10 +42,22 @@ function ConfidenceBadge({ score }: { score: number }) {
   );
 }
 
+const IMPL_STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  queued:           { label: "Kuyruğa alındı",                  color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  sent:             { label: "Claude Code'a gönderildi",         color: "bg-blue-50 text-blue-700 border-blue-200" },
+  running:          { label: "Çalışıyor",                        color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  completed:        { label: "Tamamlandı ✓",                     color: "bg-green-50 text-green-700 border-green-200" },
+  failed:           { label: "Hata aldı",                        color: "bg-red-50 text-red-700 border-red-200" },
+  review_required:  { label: "Review gerekiyor",                 color: "bg-amber-50 text-amber-700 border-amber-200" },
+};
+
 export default function DecisionResult({ request, result, onReset }: DecisionResultProps) {
   const [status, setStatus] = useState<DecisionStatus>(request.status);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [implementationTask, setImplementationTask] = useState<ImplementationTaskInfo | null>(null);
+  const [followUps, setFollowUps] = useState<DecisionFollowUp[]>(result.followUps ?? []);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   const handleDelete = async () => {
     if (!window.confirm("Bu raporu silmek istediğinize emin misiniz?")) return;
@@ -491,12 +509,85 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         </div>
       </div>
 
+      {/* Uygulama Durumu */}
+      {implementationTask && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+            <span>⚡</span> Uygulama Durumu
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {(() => {
+                const s = IMPL_STATUS_LABEL[implementationTask.status] ?? IMPL_STATUS_LABEL.queued;
+                return (
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${s.color}`}>
+                    {s.label}
+                  </span>
+                );
+              })()}
+              <span className="text-xs text-gray-400 font-mono">
+                #{implementationTask.taskId.slice(0, 8)}
+              </span>
+            </div>
+            <p className="text-sm font-medium text-gray-700">{implementationTask.promptTitle}</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(implementationTask.promptBody);
+                  setCopiedPrompt(true);
+                  setTimeout(() => setCopiedPrompt(false), 2000);
+                }}
+                className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition cursor-pointer font-medium"
+              >
+                {copiedPrompt ? "Kopyalandı ✓" : "Prompt'u Kopyala"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Takip Soruları */}
+      {followUps.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+            <span>💬</span> Takip Soruları
+          </h3>
+          <div className="space-y-4">
+            {followUps.map((fu) => (
+              <div key={fu.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100">
+                  <p className="text-sm font-medium text-gray-800">{fu.question}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {fu.createdAt.toLocaleString("tr-TR", {
+                      day: "numeric",
+                      month: "long",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{fu.answer}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Aksiyon Butonları */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
           <span>⚡</span> Aksiyonlar
         </h3>
-        <ActionButtons result={result} status={status} onStatusChange={setStatus} />
+        <ActionButtons
+          request={request}
+          result={result}
+          status={status}
+          onStatusChange={setStatus}
+          onFollowUpAdded={(fu) => setFollowUps((prev) => [...prev, fu])}
+          onTaskCreated={setImplementationTask}
+        />
       </div>
     </div>
   );

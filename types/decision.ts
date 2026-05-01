@@ -36,9 +36,28 @@ export type DecisionStatus =
   | "approved"
   | "rejected"
   | "observation"
-  | "prompt_generated";
+  | "prompt_generated"
+  | "implementation_queued"
+  | "implementation_running"
+  | "implementation_completed"
+  | "implementation_failed"
+  | "review_required";
 
 export type AIRole = "chatgpt_judge" | "claude_engineer" | "codex_reviewer";
+
+export interface DecisionFollowUp {
+  id: string;
+  question: string;
+  answer: string;
+  createdAt: Date;
+}
+
+export interface ImplementationTaskInfo {
+  taskId: string;
+  status: string;
+  promptTitle: string;
+  promptBody: string;
+}
 
 export interface AIAnalysis {
   role: AIRole;
@@ -97,4 +116,5 @@ export interface DecisionResult {
   saved?: boolean;
   recordId?: string;
   enrichedAttachments?: DecisionAttachment[];
+  followUps?: DecisionFollowUp[];
 }
