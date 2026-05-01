@@ -39,11 +39,14 @@ function buildAttachmentContext(attachments?: DecisionAttachment[]): string {
         return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [content_extracted — görsel analizi]\n  Görsel Özeti:\n${a.contentSummary}`;
       }
     }
+    if (a.type === "application/pdf") {
+      return `- ${a.name} (application/pdf, ${(a.size / 1024).toFixed(0)} KB) [unsupported]\n  PDF eklendi ancak içerik analizi geçici olarak desteklenmiyor. AI bu PDF'in içeriğini görmüş gibi davranmamalıdır.`;
+    }
     const status = a.analysisStatus ?? "metadata_only";
     const summary = a.contentSummary ? ` — ${a.contentSummary}` : "";
     return `- ${a.name} (${a.type}, ${(a.size / 1024).toFixed(0)} KB) [${status}]${summary}`;
   });
-  return `\n\nREFERANS DOSYALAR:\nÖnemli: content_extracted durumundaki dosyaların içeriğini analizde aktif olarak kullan. metadata_only durumundaki dosyaların içeriğini görmüş gibi davranma; yalnızca dosyanın varlığını bağlam sinyali olarak değerlendir.\n\n${lines.join("\n\n")}`;
+  return `\n\nREFERANS DOSYALAR:\nÖnemli: content_extracted durumundaki dosyaların içeriğini analizde aktif olarak kullan. metadata_only veya unsupported durumundaki dosyaların içeriğini görmüş gibi davranma; yalnızca dosyanın varlığını bağlam sinyali olarak değerlendir.\n\n${lines.join("\n\n")}`;
 }
 
 async function processAttachments(
@@ -95,41 +98,15 @@ async function processAttachments(
         return { ...rest, visionStatus: "error" as const, contentSummary: "Görsel analizi başarısız." };
       }
 
-      // ── PDF: metin çıkarma (pdf-parse@2.x: PDFParse class API) ─────────────
-      if (att.type === "application/pdf" && att.dataUrl) {
-        console.log("[verdict-ai] pdf parse attempt", logMeta);
-        let parser: { getText: () => Promise<{ text: string }>; destroy: () => Promise<void> } | undefined;
-        try {
-          const commaIdx = att.dataUrl.indexOf(",");
-          const base64 = commaIdx >= 0 ? att.dataUrl.slice(commaIdx + 1) : att.dataUrl;
-          if (!base64) throw new Error("base64 boş");
-          const buffer = Buffer.from(base64, "base64");
-          console.log("[verdict-ai] pdf buffer", { name: att.name, base64Len: base64.length, bufferLen: buffer.length });
-
-          const { PDFParse } = await import("pdf-parse");
-          parser = new PDFParse({ data: buffer });
-          const result = await parser.getText();
-          const rawText = (result.text ?? "").slice(0, 15000);
-          const text = cleanExtractedText(rawText);
-          console.log("[verdict-ai] pdf parse success", { name: att.name, textLen: text.length });
-          const { dataUrl: _d, ...rest } = att; void _d;
-          return {
-            ...rest,
-            contentText: text,
-            analysisStatus: "content_extracted" as const,
-            contentSummary: "PDF içeriği analiz edildi.",
-          };
-        } catch (err) {
-          console.warn("[verdict-ai] pdf parse error", {
-            name: att.name,
-            error: err instanceof Error ? err.message : "unknown",
-            stack: err instanceof Error ? err.stack?.split("\n").slice(0, 3).join(" | ") : undefined,
-          });
-          const { dataUrl: _d, ...rest } = att; void _d;
-          return { ...rest, analysisStatus: "error" as const, contentSummary: "PDF içeriği okunamadı." };
-        } finally {
-          try { await parser?.destroy(); } catch { /* ignore cleanup errors */ }
-        }
+      // ── PDF: içerik analizi geçici olarak desteklenmiyor ───────────────────
+      if (att.type === "application/pdf") {
+        console.log("[verdict-ai] pdf unsupported (parse disabled)", { name: att.name, sizeKB: Math.round(att.size / 1024) });
+        const { dataUrl: _d, ...rest } = att; void _d;
+        return {
+          ...rest,
+          analysisStatus: "unsupported" as const,
+          contentSummary: "PDF içerik analizi geçici olarak desteklenmiyor. PDF içeriğini analiz ettirmek için metni TXT veya Markdown olarak ekleyin.",
+        };
       }
 
       // ── TXT/JSON/MD: RTF temizleme ─────────────────────────────────────────

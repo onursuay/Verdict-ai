@@ -443,6 +443,8 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                             ? "bg-green-50 text-green-700 border-green-200"
                             : att.analysisStatus === "metadata_only"
                             ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                            : att.analysisStatus === "unsupported" && att.type === "application/pdf"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
                             : att.analysisStatus === "error"
                             ? "bg-red-50 text-red-600 border-red-200"
                             : "bg-gray-50 text-gray-500 border-gray-200"
@@ -450,12 +452,11 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                           {att.analysisStatus === "content_extracted"
                             ? att.visionStatus === "analyzed"
                               ? "Görsel içeriği analiz edildi"
-                              : att.type === "application/pdf"
-                              ? "PDF içeriği analiz edildi"
                               : "İçerik analiz edildi"
                             : att.analysisStatus === "metadata_only" ? "Sadece dosya bilgisi kullanıldı"
                             : att.analysisStatus === "too_large" ? "Çok büyük"
-                            : att.analysisStatus === "unsupported" ? "Desteklenmiyor"
+                            : att.analysisStatus === "unsupported"
+                              ? att.type === "application/pdf" ? "PDF analizi geçici desteklenmiyor" : "Desteklenmiyor"
                             : att.analysisStatus === "error" ? "İçerik okunamadı"
                             : "Metadata"}
                         </span>
@@ -469,6 +470,11 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                       {att.analysisStatus === "content_extracted" && att.contentText && (
                         <p className="mt-2 text-gray-500 bg-gray-50 rounded p-2 font-mono text-[11px] leading-relaxed break-all">
                           {att.contentText.slice(0, 300)}{att.contentText.length > 300 ? "…" : ""}
+                        </p>
+                      )}
+                      {att.analysisStatus === "unsupported" && att.type === "application/pdf" && (
+                        <p className="mt-1.5 text-amber-700 bg-amber-50 border border-amber-100 rounded p-2 text-[12px] leading-relaxed">
+                          PDF içeriğini analiz ettirmek için metni TXT veya Markdown olarak ekleyin.
                         </p>
                       )}
                       {att.analysisStatus === "metadata_only" && (

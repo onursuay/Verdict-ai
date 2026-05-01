@@ -97,19 +97,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           addIfRoom({ ...base, analysisStatus: "error", visionStatus: "error", contentSummary: "Görsel okunamadı." });
         imgReader.readAsDataURL(f);
       } else if (f.type === "application/pdf") {
-        const pdfReader = new FileReader();
-        pdfReader.onload = (e) => {
-          const dataUrl = e.target?.result as string ?? "";
-          addIfRoom({
-            ...base,
-            dataUrl,
-            analysisStatus: "metadata_only",
-            contentSummary: "PDF backend tarafında okunacak.",
-          });
-        };
-        pdfReader.onerror = () =>
-          addIfRoom({ ...base, analysisStatus: "error", contentSummary: "PDF okunamadı." });
-        pdfReader.readAsDataURL(f);
+        // PDF parse geçici olarak devre dışı; sadece metadata kaydediyoruz
+        addIfRoom({
+          ...base,
+          analysisStatus: "unsupported",
+          contentSummary: "PDF içerik analizi geçici olarak desteklenmiyor. PDF içeriğini analiz ettirmek için metni TXT veya Markdown olarak ekleyin.",
+        });
       } else {
         addIfRoom({ ...base, analysisStatus: "unsupported" });
       }
