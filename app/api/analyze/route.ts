@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { AIAnalysis, DecisionRequest } from "@/types/decision";
 import { generateMockDecision } from "@/lib/mock-decision";
 
-const CLAUDE_MODEL = "claude-sonnet-4-6";
+const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
 function buildClaudePrompt(req: DecisionRequest): string {
   return `Sen deneyimli bir yazılım mühendisi ve teknik mimarısın. Aşağıdaki yazılım talebini analiz et ve sonucu SADECE geçerli JSON formatında ver.
