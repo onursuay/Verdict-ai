@@ -40,7 +40,7 @@ export default function Home() {
               <span className="text-white text-xs font-bold">AI</span>
             </div>
             <span className="font-bold text-gray-900 text-sm tracking-tight">
-              Karar Masası
+              Verdict AI
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -64,10 +64,10 @@ export default function Home() {
                 Çoklu AI · Hakem Sistemi
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
-                AI Karar Masası
+                Verdict AI
               </h1>
               <p className="text-gray-500 text-base max-w-md mx-auto">
-                Tek input, çoklu analiz, tek nihai karar.
+                Tek input. Çoklu yapay zekâ analizi. Tek nihai karar.
                 <br />
                 Claude · Codex · ChatGPT bir arada.
               </p>
@@ -133,7 +133,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="mt-16 pb-8 text-center text-xs text-gray-400">
-        AI Karar Masası — Mock Mod · Gerçek API entegrasyonu için yapılandırılmamış
+        Verdict AI — Mock Mod · Gerçek API entegrasyonu için yapılandırılmamış
       </footer>
     </div>
   );

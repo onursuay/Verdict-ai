@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Karar Masası",
-  description: "Tek input, çoklu analiz, tek nihai karar.",
+  title: "Verdict AI",
+  description: "AI destekli çoklu analiz ve nihai karar platformu.",
 };
 
 export default function RootLayout({
