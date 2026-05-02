@@ -70,13 +70,15 @@ export default function Home() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#1b2638] text-slate-100">
       <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.07),transparent_32%),linear-gradient(180deg,#223149_0%,#1b2638_48%,#202d42_100%)]" />
-      <div className="light-sweep-layer" aria-hidden="true">
-        <span className="light-sweep light-sweep-1" />
-        <span className="light-sweep light-sweep-2" />
-        <span className="light-sweep light-sweep-3" />
-        <span className="light-sweep light-sweep-4" />
-        <span className="light-glow light-glow-1" />
-        <span className="light-glow light-glow-2" />
+      <div className="shimmer-layer" aria-hidden="true">
+        <span className="shimmer-line shimmer-line-1" />
+        <span className="shimmer-line shimmer-line-2" />
+        <span className="shimmer-line shimmer-line-3" />
+        <span className="shimmer-line shimmer-line-4" />
+        <span className="shimmer-line shimmer-line-5" />
+        <span className="shimmer-line shimmer-line-6" />
+        <span className="shimmer-line shimmer-line-7" />
+        <span className="shimmer-line shimmer-line-8" />
       </div>
       {/* Navbar */}
       <header className="sticky top-0 z-10 border-b border-slate-500/40 bg-[#223047]/90 backdrop-blur-xl">
