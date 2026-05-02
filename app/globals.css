@@ -26,3 +26,159 @@ body {
   background: rgba(45, 212, 191, 0.28);
   color: #ecfeff;
 }
+
+.algorithm-layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.algo-item {
+  position: absolute;
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.18);
+  color: rgba(204, 251, 241, 0.34);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1;
+  padding: 7px 10px;
+  white-space: nowrap;
+  box-shadow: 0 0 18px rgba(45, 212, 191, 0.06);
+  animation: algo-bounce-x 18s ease-in-out infinite alternate;
+}
+
+.algo-line {
+  position: absolute;
+  height: 1px;
+  width: 180px;
+  background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.18), transparent);
+  transform-origin: center;
+  animation: algo-line-scan 22s ease-in-out infinite alternate;
+}
+
+.algo-item-1 {
+  left: 4%;
+  top: 18%;
+  animation-duration: 19s;
+}
+
+.algo-item-2 {
+  left: 72%;
+  top: 22%;
+  animation-duration: 16s;
+  animation-delay: -4s;
+}
+
+.algo-item-3 {
+  left: 12%;
+  top: 54%;
+  animation-duration: 21s;
+  animation-delay: -7s;
+}
+
+.algo-item-4 {
+  left: 78%;
+  top: 58%;
+  animation-duration: 18s;
+  animation-delay: -9s;
+}
+
+.algo-item-5 {
+  left: 45%;
+  top: 14%;
+  animation-duration: 15s;
+  animation-delay: -5s;
+}
+
+.algo-item-6 {
+  left: 5%;
+  top: 82%;
+  animation-duration: 24s;
+  animation-delay: -11s;
+}
+
+.algo-item-7 {
+  left: 66%;
+  top: 84%;
+  animation-duration: 20s;
+  animation-delay: -13s;
+}
+
+.algo-line-1 {
+  left: 18%;
+  top: 34%;
+  rotate: -14deg;
+}
+
+.algo-line-2 {
+  left: 62%;
+  top: 43%;
+  rotate: 18deg;
+  animation-delay: -8s;
+}
+
+.algo-line-3 {
+  left: 28%;
+  top: 75%;
+  rotate: 7deg;
+  animation-delay: -14s;
+}
+
+@keyframes algo-bounce-x {
+  0% {
+    transform: translate3d(-24px, 0, 0);
+    opacity: 0.16;
+  }
+
+  50% {
+    opacity: 0.42;
+  }
+
+  100% {
+    transform: translate3d(46px, 0, 0);
+    opacity: 0.22;
+  }
+}
+
+@keyframes algo-line-scan {
+  0% {
+    transform: translate3d(-38px, 0, 0) scaleX(0.7);
+    opacity: 0.08;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+
+  100% {
+    transform: translate3d(58px, 0, 0) scaleX(1);
+    opacity: 0.1;
+  }
+}
+
+@media (max-width: 640px) {
+  .algo-item {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+
+  .algo-item-2,
+  .algo-item-4,
+  .algo-item-7 {
+    left: 58%;
+  }
+
+  .algo-line {
+    width: 120px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .algo-item,
+  .algo-line {
+    animation: none;
+  }
+}

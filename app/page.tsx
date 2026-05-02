@@ -69,7 +69,19 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#1b2638] text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.07),transparent_32%),linear-gradient(180deg,#223149_0%,#1b2638_48%,#202d42_100%)]" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.07),transparent_32%),linear-gradient(180deg,#223149_0%,#1b2638_48%,#202d42_100%)]" />
+      <div className="algorithm-layer" aria-hidden="true">
+        <span className="algo-item algo-item-1">if risk &gt; 70</span>
+        <span className="algo-item algo-item-2">score++</span>
+        <span className="algo-item algo-item-3">0101</span>
+        <span className="algo-item algo-item-4">route()</span>
+        <span className="algo-item algo-item-5">AI</span>
+        <span className="algo-item algo-item-6">{"{ verdict }"}</span>
+        <span className="algo-item algo-item-7">confidence</span>
+        <span className="algo-line algo-line-1" />
+        <span className="algo-line algo-line-2" />
+        <span className="algo-line algo-line-3" />
+      </div>
       {/* Navbar */}
       <header className="sticky top-0 z-10 border-b border-slate-500/40 bg-[#223047]/90 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 min-h-16 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
