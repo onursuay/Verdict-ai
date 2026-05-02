@@ -35,150 +35,107 @@ body {
   overflow: hidden;
 }
 
-.algo-item {
+.network-field {
   position: absolute;
-  border: 1px solid rgba(125, 211, 252, 0.16);
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.18);
-  color: rgba(204, 251, 241, 0.34);
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  line-height: 1;
-  padding: 7px 10px;
-  white-space: nowrap;
-  box-shadow: 0 0 18px rgba(45, 212, 191, 0.06);
-  animation: algo-bounce-x 18s ease-in-out infinite alternate;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 1;
 }
 
-.algo-line {
-  position: absolute;
-  height: 1px;
-  width: 180px;
-  background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.18), transparent);
+.network-cluster {
+  fill: rgba(226, 232, 240, 0.78);
+  stroke: rgba(226, 232, 240, 0.42);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.65;
+  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.2));
+  transform-box: fill-box;
   transform-origin: center;
-  animation: algo-line-scan 22s ease-in-out infinite alternate;
+  animation: network-drift 16s ease-in-out infinite alternate;
 }
 
-.algo-item-1 {
-  left: 4%;
-  top: 18%;
-  animation-duration: 19s;
+.network-cluster path {
+  fill: transparent !important;
+  opacity: 0.95;
 }
 
-.algo-item-2 {
-  left: 72%;
-  top: 22%;
-  animation-duration: 16s;
-  animation-delay: -4s;
+.network-cluster circle {
+  stroke: rgba(226, 232, 240, 0.38);
+  stroke-width: 1;
+  animation: node-pulse 4.8s ease-in-out infinite;
 }
 
-.algo-item-3 {
-  left: 12%;
-  top: 54%;
-  animation-duration: 21s;
+.network-cluster .node-hot {
+  fill: rgba(52, 211, 153, 0.88);
+  stroke: rgba(94, 234, 212, 0.62);
+}
+
+.network-left-top {
+  animation-duration: 18s;
+}
+
+.network-left-bottom {
+  animation-duration: 22s;
   animation-delay: -7s;
 }
 
-.algo-item-4 {
-  left: 78%;
-  top: 58%;
-  animation-duration: 18s;
-  animation-delay: -9s;
-}
-
-.algo-item-5 {
-  left: 45%;
-  top: 14%;
-  animation-duration: 15s;
+.network-right-top {
+  animation-duration: 20s;
   animation-delay: -5s;
 }
 
-.algo-item-6 {
-  left: 5%;
-  top: 82%;
+.network-right-bottom {
   animation-duration: 24s;
   animation-delay: -11s;
 }
 
-.algo-item-7 {
-  left: 66%;
-  top: 84%;
-  animation-duration: 20s;
-  animation-delay: -13s;
-}
-
-.algo-line-1 {
-  left: 18%;
-  top: 34%;
-  rotate: -14deg;
-}
-
-.algo-line-2 {
-  left: 62%;
-  top: 43%;
-  rotate: 18deg;
-  animation-delay: -8s;
-}
-
-.algo-line-3 {
-  left: 28%;
-  top: 75%;
-  rotate: 7deg;
-  animation-delay: -14s;
-}
-
-@keyframes algo-bounce-x {
+@keyframes network-drift {
   0% {
-    transform: translate3d(-24px, 0, 0);
-    opacity: 0.16;
+    transform: translate3d(-24px, -8px, 0) scale(0.98);
+    opacity: 0.66;
   }
 
-  50% {
-    opacity: 0.42;
+  45% {
+    opacity: 1;
   }
 
   100% {
-    transform: translate3d(46px, 0, 0);
-    opacity: 0.22;
+    transform: translate3d(34px, 12px, 0) scale(1.02);
+    opacity: 0.74;
   }
 }
 
-@keyframes algo-line-scan {
-  0% {
-    transform: translate3d(-38px, 0, 0) scaleX(0.7);
-    opacity: 0.08;
+@keyframes node-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
   }
 
   50% {
-    opacity: 0.25;
-  }
-
-  100% {
-    transform: translate3d(58px, 0, 0) scaleX(1);
-    opacity: 0.1;
+    opacity: 1;
   }
 }
 
 @media (max-width: 640px) {
-  .algo-item {
-    font-size: 10px;
-    padding: 6px 8px;
+  .network-field {
+    opacity: 0.72;
   }
 
-  .algo-item-2,
-  .algo-item-4,
-  .algo-item-7 {
-    left: 58%;
+  .network-left-top,
+  .network-left-bottom {
+    transform: translateX(-120px);
   }
 
-  .algo-line {
-    width: 120px;
+  .network-right-top,
+  .network-right-bottom {
+    transform: translateX(120px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .algo-item,
-  .algo-line {
+  .network-cluster,
+  .network-cluster circle {
     animation: none;
   }
 }
