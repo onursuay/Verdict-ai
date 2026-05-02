@@ -68,10 +68,10 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#101827] text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.08),transparent_32%),linear-gradient(180deg,#142033_0%,#101827_48%,#111c2e_100%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-[#1b2638] text-slate-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.07),transparent_32%),linear-gradient(180deg,#223149_0%,#1b2638_48%,#202d42_100%)]" />
       {/* Navbar */}
-      <header className="sticky top-0 z-10 border-b border-slate-600/40 bg-[#151f32]/90 backdrop-blur-xl">
+      <header className="sticky top-0 z-10 border-b border-slate-500/40 bg-[#223047]/90 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 min-h-16 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div className="flex min-w-[150px] items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-300 via-teal-400 to-cyan-400 flex items-center justify-center shadow-sm">
@@ -81,7 +81,7 @@ export default function Home() {
               Verdict AI
             </span>
           </div>
-          <div className="order-3 flex w-full justify-center gap-1 rounded-full border border-slate-600/45 bg-slate-900/35 p-1 sm:order-none sm:w-auto">
+          <div className="order-3 flex w-full justify-center gap-1 rounded-full border border-slate-500/45 bg-slate-700/35 p-1 sm:order-none sm:w-auto">
             <button
               onClick={() => handleTabClick("new")}
               className={`px-3.5 py-1.5 text-sm font-medium rounded-full transition cursor-pointer ${
@@ -161,7 +161,7 @@ export default function Home() {
             </div>
 
             {/* Form */}
-            <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-6 sm:p-8">
+            <div className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm p-6 sm:p-8">
               <h2 className="text-base font-semibold text-slate-100 mb-6 flex items-center gap-2">
                 <span>📋</span>
                 Yeni Karar Talebi

@@ -38,9 +38,9 @@ const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   rejected: { label: "Reddedildi", className: "bg-red-400/10 text-red-200 border-red-300/25" },
   observation: { label: "Gözlem", className: "bg-amber-400/10 text-amber-200 border-amber-300/25" },
   prompt_generated: { label: "Prompt Üretildi", className: "bg-cyan-400/10 text-cyan-200 border-cyan-300/25" },
-  completed: { label: "Tamamlandı", className: "bg-slate-800/70 text-slate-300 border-slate-600/45" },
-  analyzing: { label: "Analiz Ediliyor", className: "bg-slate-800/70 text-slate-300 border-slate-600/45" },
-  draft: { label: "Taslak", className: "bg-slate-800/70 text-slate-400 border-slate-600/45" },
+  completed: { label: "Tamamlandı", className: "bg-slate-700/70 text-slate-200 border-slate-500/45" },
+  analyzing: { label: "Analiz Ediliyor", className: "bg-slate-700/70 text-slate-200 border-slate-500/45" },
+  draft: { label: "Taslak", className: "bg-slate-700/70 text-slate-300 border-slate-500/45" },
 };
 
 function SourceBadge({ label, source }: { label: string; source: AnalysisSource | null | undefined }) {
@@ -50,7 +50,7 @@ function SourceBadge({ label, source }: { label: string; source: AnalysisSource 
       className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
         live
           ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/25"
-          : "bg-slate-800/70 text-slate-400 border-slate-600/45"
+          : "bg-slate-700/70 text-slate-300 border-slate-500/45"
       }`}
     >
       {label} · {live ? "Canlı" : "Mock"}
@@ -133,7 +133,7 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
 
   if (loading) {
     return (
-      <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-8 text-center">
+      <div className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm p-8 text-center">
         <p className="text-sm text-slate-400">Raporlar yükleniyor…</p>
       </div>
     );
@@ -141,7 +141,7 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
 
   if (error) {
     return (
-      <div className="bg-[#182235]/92 rounded-2xl border border-red-300/20 shadow-sm p-8 text-center">
+      <div className="bg-[#24324a]/92 rounded-2xl border border-red-300/20 shadow-sm p-8 text-center">
         <p className="text-sm text-red-300">{error}</p>
       </div>
     );
@@ -149,7 +149,7 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
 
   if (records.length === 0) {
     return (
-      <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-12 text-center">
+      <div className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm p-12 text-center">
         <div className="text-3xl mb-2">📂</div>
         <p className="text-sm text-slate-300">Henüz kayıtlı rapor yok.</p>
         <p className="text-xs text-slate-500 mt-1">Yeni bir karar talebi oluşturun; analiz sonrası burada listelenecek.</p>
@@ -172,12 +172,12 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
 
       {records.map((rec) => {
         const statusInfo = STATUS_LABEL[rec.status] ?? STATUS_LABEL.completed;
-        const priorityClass = PRIORITY_BADGE[rec.priority] ?? "bg-slate-800/70 text-slate-300 border-slate-600/45";
+        const priorityClass = PRIORITY_BADGE[rec.priority] ?? "bg-slate-700/70 text-slate-200 border-slate-500/45";
         const date = new Date(rec.created_at);
         return (
           <div
             key={rec.id}
-            className="bg-[#182235]/92 rounded-xl border border-slate-600/40 shadow-sm p-4 hover:border-emerald-300/25 transition"
+            className="bg-[#24324a]/92 rounded-xl border border-slate-500/40 shadow-sm p-4 hover:border-emerald-300/25 transition"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -189,7 +189,7 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusInfo.className}`}>
                     {statusInfo.label}
                   </span>
-                  <span className="text-[10px] text-slate-400 bg-slate-800/70 border border-slate-600/45 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] text-slate-300 bg-slate-700/70 border border-slate-500/45 px-2 py-0.5 rounded-full">
                     {rec.request_type}
                   </span>
                 </div>

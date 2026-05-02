@@ -160,8 +160,8 @@ export default function ActionButtons({
           onClick={() => setShowFollowUp((prev) => !prev)}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all cursor-pointer ml-auto ${
             showFollowUp
-              ? "bg-slate-700 border-slate-500 text-slate-100"
-              : "bg-slate-900/45 border-slate-600/55 text-slate-300 hover:bg-white/[0.06] hover:border-slate-500"
+              ? "bg-slate-600 border-slate-400 text-slate-100"
+              : "bg-slate-700/45 border-slate-500/55 text-slate-200 hover:bg-white/[0.08] hover:border-slate-400"
           }`}
         >
           <span>💬</span>
@@ -176,8 +176,8 @@ export default function ActionButtons({
       )}
 
       {showFollowUp && (
-        <div className="rounded-xl border border-slate-600/45 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-600/35 bg-white/[0.035] flex items-center gap-2">
+        <div className="rounded-xl border border-slate-500/45 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-500/35 bg-white/[0.045] flex items-center gap-2">
             <span className="text-slate-400 text-sm">💬</span>
             <span className="text-sm font-semibold text-slate-100">Takip Sorusu</span>
           </div>
@@ -187,7 +187,7 @@ export default function ActionButtons({
               onChange={(e) => setFollowUpQuestion(e.target.value)}
               placeholder="Bu karar sonucuna göre ek sorunuzu yazın…"
               rows={3}
-              className="w-full text-sm text-slate-100 placeholder-slate-500 bg-[#111a2b] border border-slate-600/55 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60"
+              className="w-full text-sm text-slate-100 placeholder-slate-400 bg-[#202b40] border border-slate-500/55 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60"
             />
             {followUpError && (
               <p className="text-xs text-red-300">{followUpError}</p>

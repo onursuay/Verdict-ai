@@ -146,7 +146,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           onChange={(e) => setProjectName(e.target.value)}
           placeholder="örn: CoinBot, YoAi, Antso, Yeni Proje"
           required
-          className="w-full px-4 py-2.5 rounded-lg border border-slate-600/55 bg-[#111a2b] text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
+          className="w-full px-4 py-2.5 rounded-lg border border-slate-500/55 bg-[#202b40] text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
         />
       </div>
 
@@ -164,7 +164,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
               className={`px-3.5 py-1.5 rounded-full text-sm border font-medium transition cursor-pointer ${
                 requestType === type
                   ? "bg-gradient-to-r from-emerald-400 to-cyan-400 border-emerald-300 text-slate-950 shadow-sm"
-                  : "bg-slate-900/45 border-slate-600/55 text-slate-300 hover:border-emerald-300/45 hover:text-emerald-100 hover:bg-emerald-400/10"
+                  : "bg-slate-700/45 border-slate-500/55 text-slate-200 hover:border-emerald-300/45 hover:text-emerald-100 hover:bg-emerald-400/10"
               }`}
             >
               {type}
@@ -211,7 +211,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           placeholder="Konuyu, hatayı, hedefi veya analiz edilmesini istediğin durumu detaylı yaz…"
           required
           style={{ minHeight: "160px" }}
-          className="w-full px-4 py-2.5 rounded-lg border border-slate-600/55 bg-[#111a2b] text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition resize-none overflow-hidden"
+          className="w-full px-4 py-2.5 rounded-lg border border-slate-500/55 bg-[#202b40] text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition resize-none overflow-hidden"
         />
       </div>
 
@@ -233,7 +233,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             handleFiles(Array.from(e.dataTransfer.files));
           }}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-slate-600/60 rounded-xl p-6 text-center cursor-pointer bg-[#111a2b]/70 hover:border-emerald-300/45 hover:bg-emerald-400/10 transition"
+          className="border-2 border-dashed border-slate-500/60 rounded-xl p-6 text-center cursor-pointer bg-[#202b40]/70 hover:border-emerald-300/45 hover:bg-emerald-400/10 transition"
         >
           <p className="text-sm text-slate-400">Dosyaları buraya sürükleyin veya <span className="text-emerald-200 font-medium">seçmek için tıklayın</span></p>
           <p className="text-xs text-slate-500 mt-1">PNG, JPG, WebP, PDF, TXT, JSON, MD</p>
@@ -251,7 +251,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         {attachments.length > 0 && (
           <ul className="mt-3 space-y-2">
             {attachments.map((att) => (
-              <li key={att.id} className="flex items-center gap-3 px-3 py-2 bg-slate-900/45 rounded-lg border border-slate-600/45 text-sm">
+              <li key={att.id} className="flex items-center gap-3 px-3 py-2 bg-slate-700/45 rounded-lg border border-slate-500/45 text-sm">
                 <span className="text-emerald-200/80 flex-shrink-0">📎</span>
                 <span className="truncate text-slate-200 font-medium flex-1">{att.name}</span>
                 <span className="text-xs text-slate-500 flex-shrink-0">{att.type.split("/")[1]?.toUpperCase()}</span>
@@ -272,7 +272,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         <label className="block text-sm font-medium text-slate-300 mb-1.5">
           Beklenen Çıktı
         </label>
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-600/45 bg-slate-900/45 text-sm text-slate-400 select-none">
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-500/45 bg-slate-700/45 text-sm text-slate-300 select-none">
           <span className="text-slate-500 text-xs">Otomatik:</span>
           <span className="font-medium text-emerald-100">{OUTPUT_BY_TYPE[requestType]}</span>
           <span className="ml-auto text-xs text-slate-500">Talep tipine göre belirlenir</span>
@@ -280,12 +280,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       </div>
 
       {/* Repo Gerekli */}
-      <div className="flex items-center gap-3 p-4 bg-slate-900/45 rounded-lg border border-slate-600/45">
+      <div className="flex items-center gap-3 p-4 bg-slate-700/45 rounded-lg border border-slate-500/45">
         <button
           type="button"
           onClick={() => setRepoRequired(!repoRequired)}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
-            repoRequired ? "bg-emerald-400" : "bg-slate-700"
+            repoRequired ? "bg-emerald-400" : "bg-slate-600"
           }`}
         >
           <span
@@ -299,7 +299,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           <span className="text-slate-500 text-xs font-normal">
             AI karar verirken GitHub repo/kod bağlamı gerekiyorsa açın.
           </span>
-          <span className="text-xs font-medium text-slate-400 bg-slate-800 border border-slate-600/50 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-medium text-slate-300 bg-slate-700/70 border border-slate-500/50 px-2 py-0.5 rounded-full">
             Hazırlık
           </span>
         </span>

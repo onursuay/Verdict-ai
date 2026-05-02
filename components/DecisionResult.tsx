@@ -125,7 +125,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${badge.className}`}>
               {badge.label}
             </span>
-            <span className="text-xs text-slate-300 bg-slate-800/80 border border-slate-600/45 px-2.5 py-1 rounded-full">
+            <span className="text-xs text-slate-200 bg-slate-700/80 border border-slate-500/45 px-2.5 py-1 rounded-full">
               {request.requestType}
             </span>
             {result.saved === true ? (
@@ -133,7 +133,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                 Kayıt alındı
               </span>
             ) : (
-              <span className="text-xs font-medium text-slate-400 bg-slate-800/70 border border-slate-600/45 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-medium text-slate-300 bg-slate-700/70 border border-slate-500/45 px-2 py-0.5 rounded-full">
                 Kayıt yapılmadı
               </span>
             )}
@@ -296,7 +296,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                     Canlı Denetçi
                   </span>
                 ) : (
-                  <span className="text-xs font-semibold bg-slate-800/80 text-slate-400 border border-slate-600/40 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold bg-slate-700/80 text-slate-300 border border-slate-500/40 px-2 py-0.5 rounded-full">
                     Mock Denetçi
                   </span>
                 )}
@@ -335,8 +335,8 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
       </div>
 
       {/* Nihai Rapor */}
-      <div id="verdict-report" className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-600/35 bg-white/[0.035]">
+      <div id="verdict-report" className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-500/35 bg-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-base">📄</span>
             <h3 className="font-semibold text-slate-100 text-sm">Nihai Rapor</h3>
@@ -375,7 +375,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                 { label: "Codex Denetçi", source: result.codexSource },
                 { label: "ChatGPT Hakem", source: result.judgeSource },
               ].map((ai) => (
-                <span key={ai.label} className={`text-xs px-2.5 py-1 rounded-full font-medium border ${ai.source === "live" ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20" : "bg-slate-800/70 text-slate-400 border-slate-600/40"}`}>
+                <span key={ai.label} className={`text-xs px-2.5 py-1 rounded-full font-medium border ${ai.source === "live" ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20" : "bg-slate-700/70 text-slate-300 border-slate-500/40"}`}>
                   {ai.label} — {ai.source === "live" ? "Canlı" : "Mock"}
                 </span>
               ))}
@@ -451,7 +451,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Eklenen Referans Dosyalar</h4>
                 <ul className="space-y-2">
                   {request.attachments.map((att) => (
-                    <li key={att.id} className="text-xs text-slate-300 border border-slate-600/35 rounded-lg p-3 bg-slate-900/35">
+                    <li key={att.id} className="text-xs text-slate-300 border border-slate-500/35 rounded-lg p-3 bg-slate-700/35">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-emerald-200/80">📎</span>
                         <span className="font-medium text-slate-100">{att.name}</span>
@@ -465,7 +465,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                             ? "bg-amber-400/10 text-amber-200 border-amber-300/20"
                             : att.analysisStatus === "error"
                             ? "bg-red-400/10 text-red-200 border-red-300/20"
-                            : "bg-slate-800/70 text-slate-400 border-slate-600/40"
+                            : "bg-slate-700/70 text-slate-300 border-slate-500/40"
                         }`}>
                           {att.analysisStatus === "content_extracted"
                             ? att.visionStatus === "analyzed"
@@ -511,7 +511,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
 
       {/* Uygulama Durumu */}
       {implementationTask && (
-        <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-5">
+        <div className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
             <span>⚡</span> Uygulama Durumu
           </h3>
@@ -548,14 +548,14 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
 
       {/* Takip Soruları */}
       {followUps.length > 0 && (
-        <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-5">
+        <div className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
             <span>💬</span> Takip Soruları
           </h3>
           <div className="space-y-4">
             {followUps.map((fu) => (
               <div key={fu.id} className="border border-slate-600/40 rounded-xl overflow-hidden">
-                <div className="bg-white/[0.035] px-4 py-2.5 border-b border-slate-600/35">
+                <div className="bg-white/[0.04] px-4 py-2.5 border-b border-slate-500/35">
                   <p className="text-sm font-medium text-slate-100">{fu.question}</p>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {fu.createdAt.toLocaleString("tr-TR", {
@@ -576,7 +576,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
       )}
 
       {/* Aksiyon Butonları */}
-      <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-5">
+      <div className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm p-5">
         <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
           <span>⚡</span> Aksiyonlar
         </h3>
