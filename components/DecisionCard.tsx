@@ -22,8 +22,8 @@ export default function DecisionCard({
   children,
 }: DecisionCardProps) {
   return (
-    <div className="bg-[#08111f]/90 rounded-2xl border border-emerald-300/10 shadow-[0_18px_50px_rgba(0,0,0,0.28)] overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10 bg-white/[0.03]">
+    <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-600/35 bg-white/[0.035]">
         <span className="text-xl">{icon}</span>
         <h3 className="font-semibold text-slate-100 text-sm">{title}</h3>
         {badge && (

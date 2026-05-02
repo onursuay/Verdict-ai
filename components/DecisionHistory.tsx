@@ -28,19 +28,19 @@ interface DecisionHistoryProps {
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
-  Kritik: "bg-red-50 text-red-700 border-red-200",
-  Orta: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  Düşük: "bg-green-50 text-green-700 border-green-200",
+  Kritik: "bg-red-400/10 text-red-200 border-red-300/25",
+  Orta: "bg-amber-400/10 text-amber-200 border-amber-300/25",
+  Düşük: "bg-emerald-400/10 text-emerald-200 border-emerald-300/25",
 };
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
-  approved: { label: "Onaylandı", className: "bg-green-50 text-green-700 border-green-200" },
-  rejected: { label: "Reddedildi", className: "bg-red-50 text-red-700 border-red-200" },
-  observation: { label: "Gözlem", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  prompt_generated: { label: "Prompt Üretildi", className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  completed: { label: "Tamamlandı", className: "bg-gray-50 text-gray-600 border-gray-200" },
-  analyzing: { label: "Analiz Ediliyor", className: "bg-gray-50 text-gray-500 border-gray-200" },
-  draft: { label: "Taslak", className: "bg-gray-50 text-gray-500 border-gray-200" },
+  approved: { label: "Onaylandı", className: "bg-emerald-400/10 text-emerald-200 border-emerald-300/25" },
+  rejected: { label: "Reddedildi", className: "bg-red-400/10 text-red-200 border-red-300/25" },
+  observation: { label: "Gözlem", className: "bg-amber-400/10 text-amber-200 border-amber-300/25" },
+  prompt_generated: { label: "Prompt Üretildi", className: "bg-cyan-400/10 text-cyan-200 border-cyan-300/25" },
+  completed: { label: "Tamamlandı", className: "bg-slate-800/70 text-slate-300 border-slate-600/45" },
+  analyzing: { label: "Analiz Ediliyor", className: "bg-slate-800/70 text-slate-300 border-slate-600/45" },
+  draft: { label: "Taslak", className: "bg-slate-800/70 text-slate-400 border-slate-600/45" },
 };
 
 function SourceBadge({ label, source }: { label: string; source: AnalysisSource | null | undefined }) {
@@ -49,8 +49,8 @@ function SourceBadge({ label, source }: { label: string; source: AnalysisSource 
     <span
       className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
         live
-          ? "bg-green-50 text-green-700 border-green-200"
-          : "bg-gray-50 text-gray-500 border-gray-200"
+          ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/25"
+          : "bg-slate-800/70 text-slate-400 border-slate-600/45"
       }`}
     >
       {label} · {live ? "Canlı" : "Mock"}
@@ -133,26 +133,26 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-        <p className="text-sm text-gray-500">Raporlar yükleniyor…</p>
+      <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-8 text-center">
+        <p className="text-sm text-slate-400">Raporlar yükleniyor…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-8 text-center">
-        <p className="text-sm text-red-600">{error}</p>
+      <div className="bg-[#182235]/92 rounded-2xl border border-red-300/20 shadow-sm p-8 text-center">
+        <p className="text-sm text-red-300">{error}</p>
       </div>
     );
   }
 
   if (records.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+      <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-12 text-center">
         <div className="text-3xl mb-2">📂</div>
-        <p className="text-sm text-gray-500">Henüz kayıtlı rapor yok.</p>
-        <p className="text-xs text-gray-400 mt-1">Yeni bir karar talebi oluşturun; analiz sonrası burada listelenecek.</p>
+        <p className="text-sm text-slate-300">Henüz kayıtlı rapor yok.</p>
+        <p className="text-xs text-slate-500 mt-1">Yeni bir karar talebi oluşturun; analiz sonrası burada listelenecek.</p>
       </div>
     );
   }
@@ -160,40 +160,40 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-semibold text-gray-800">Geçmiş Raporlar</h2>
-        <span className="text-xs text-gray-400">{records.length} kayıt</span>
+        <h2 className="text-base font-semibold text-slate-100">Geçmiş Raporlar</h2>
+        <span className="text-xs text-slate-500">{records.length} kayıt</span>
       </div>
 
       {deleteError && (
-        <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+        <p className="text-xs text-red-200 bg-red-400/10 border border-red-300/20 rounded-lg px-3 py-2">
           {deleteError}
         </p>
       )}
 
       {records.map((rec) => {
         const statusInfo = STATUS_LABEL[rec.status] ?? STATUS_LABEL.completed;
-        const priorityClass = PRIORITY_BADGE[rec.priority] ?? "bg-gray-50 text-gray-600 border-gray-200";
+        const priorityClass = PRIORITY_BADGE[rec.priority] ?? "bg-slate-800/70 text-slate-300 border-slate-600/45";
         const date = new Date(rec.created_at);
         return (
           <div
             key={rec.id}
-            className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition"
+            className="bg-[#182235]/92 rounded-xl border border-slate-600/40 shadow-sm p-4 hover:border-emerald-300/25 transition"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold text-gray-900 text-sm truncate">{rec.project_name}</h3>
+                  <h3 className="font-semibold text-slate-100 text-sm truncate">{rec.project_name}</h3>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${priorityClass}`}>
                     {rec.priority?.toUpperCase()}
                   </span>
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusInfo.className}`}>
                     {statusInfo.label}
                   </span>
-                  <span className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] text-slate-400 bg-slate-800/70 border border-slate-600/45 px-2 py-0.5 rounded-full">
                     {rec.request_type}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1.5">
+                <p className="text-xs text-slate-500 mt-1.5">
                   {date.toLocaleString("tr-TR", {
                     day: "numeric",
                     month: "long",
@@ -211,7 +211,7 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => handleOpen(rec)}
-                  className="text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap"
+                  className="text-xs font-medium text-emerald-100 bg-emerald-400/10 hover:bg-emerald-400/15 border border-emerald-300/20 px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap"
                 >
                   Raporu Aç
                 </button>
@@ -219,7 +219,7 @@ export default function DecisionHistory({ onOpen }: DecisionHistoryProps) {
                   onClick={() => handleDelete(rec.id)}
                   disabled={deletingId === rec.id}
                   title="Raporu sil"
-                  className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition cursor-pointer disabled:opacity-50"
+                  className="text-slate-500 hover:text-red-300 hover:bg-red-400/10 p-1.5 rounded-lg transition cursor-pointer disabled:opacity-50"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

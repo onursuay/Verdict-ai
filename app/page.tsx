@@ -68,26 +68,47 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#030712] text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.18),transparent_34%),radial-gradient(circle_at_85%_12%,rgba(16,185,129,0.12),transparent_28%),linear-gradient(180deg,#03111f_0%,#030712_42%,#020617_100%)]" />
-      <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-[42rem] -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
+    <div className="relative min-h-screen overflow-hidden bg-[#101827] text-slate-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.08),transparent_32%),linear-gradient(180deg,#142033_0%,#101827_48%,#111c2e_100%)]" />
       {/* Navbar */}
-      <header className="sticky top-0 z-10 border-b border-emerald-300/10 bg-[#030712]/85 backdrop-blur-xl">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-300 via-teal-400 to-cyan-400 flex items-center justify-center shadow-[0_0_28px_rgba(45,212,191,0.28)]">
+      <header className="sticky top-0 z-10 border-b border-slate-600/40 bg-[#151f32]/90 backdrop-blur-xl">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 min-h-16 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex min-w-[150px] items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-300 via-teal-400 to-cyan-400 flex items-center justify-center shadow-sm">
               <span className="text-slate-950 text-xs font-black">AI</span>
             </div>
             <span className="font-bold text-slate-50 text-sm tracking-tight">
               Verdict AI
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-300 bg-white/[0.04] border border-white/10 px-2.5 py-1 rounded-full">
+          <div className="order-3 flex w-full justify-center gap-1 rounded-full border border-slate-600/45 bg-slate-900/35 p-1 sm:order-none sm:w-auto">
+            <button
+              onClick={() => handleTabClick("new")}
+              className={`px-3.5 py-1.5 text-sm font-medium rounded-full transition cursor-pointer ${
+                view === "new"
+                  ? "bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 shadow-sm"
+                  : "text-slate-300 hover:bg-white/[0.06] hover:text-slate-50"
+              }`}
+            >
+              Yeni Talep
+            </button>
+            <button
+              onClick={() => handleTabClick("history")}
+              className={`px-3.5 py-1.5 text-sm font-medium rounded-full transition cursor-pointer ${
+                view === "history"
+                  ? "bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 shadow-sm"
+                  : "text-slate-300 hover:bg-white/[0.06] hover:text-slate-50"
+              }`}
+            >
+              Geçmiş Raporlar
+            </button>
+          </div>
+          <div className="flex min-w-[150px] items-center justify-end gap-2">
+            <span className="text-xs text-slate-300 bg-white/[0.05] border border-slate-500/40 px-2.5 py-1 rounded-full">
               MVP v0.1
             </span>
             {claudeSource === "live" ? (
-              <span className="text-xs text-emerald-100 bg-emerald-400/10 border border-emerald-300/25 px-2.5 py-1 rounded-full shadow-[0_0_22px_rgba(16,185,129,0.12)]">
+              <span className="text-xs text-emerald-100 bg-emerald-400/10 border border-emerald-300/30 px-2.5 py-1 rounded-full">
                 Claude Canlı
               </span>
             ) : (
@@ -99,51 +120,11 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="relative z-[1] max-w-4xl mx-auto px-4 sm:px-6 py-10">
-        {/* Tabs */}
-        <div className="flex gap-1 mb-8 border-b border-white/10">
-          <button
-            onClick={() => handleTabClick("new")}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition cursor-pointer ${
-              view === "new"
-                ? "border-emerald-300 text-emerald-200"
-                : "border-transparent text-slate-500 hover:text-slate-200"
-            }`}
-          >
-            Yeni Talep
-          </button>
-          <button
-            onClick={() => handleTabClick("history")}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition cursor-pointer ${
-              view === "history"
-                ? "border-emerald-300 text-emerald-200"
-                : "border-transparent text-slate-500 hover:text-slate-200"
-            }`}
-          >
-            Geçmiş Raporlar
-          </button>
-        </div>
-
+      <main className="relative z-[1] max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {view === "new" && (
-          <div className="space-y-8">
-            {/* Hero */}
-            <div className="text-center space-y-3 pt-2 pb-2">
-              <div className="inline-flex items-center gap-2 bg-emerald-400/10 border border-emerald-300/20 text-emerald-200 text-xs font-semibold px-3 py-1.5 rounded-full shadow-[0_0_26px_rgba(45,212,191,0.12)]">
-                <span>🤖</span>
-                Çoklu AI · Hakem Sistemi
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-200 via-teal-200 to-cyan-200 tracking-tight">
-                Verdict AI
-              </h1>
-              <p className="text-slate-400 text-base max-w-md mx-auto">
-                Tek input. Çoklu yapay zekâ analizi. Tek nihai karar.
-                <br />
-                Claude · Codex · ChatGPT bir arada.
-              </p>
-            </div>
-
+          <div className="space-y-5">
             {/* AI Rolleri */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2.5">
               {[
                 {
                   name: "Claude Code",
@@ -169,18 +150,18 @@ export default function Home() {
               ].map((ai) => (
                 <div
                   key={ai.name}
-                  className={`rounded-xl border p-3 text-center shadow-[0_18px_40px_rgba(0,0,0,0.20)] backdrop-blur ${ai.color}`}
+                  className={`rounded-xl border px-2.5 py-2.5 text-center shadow-sm backdrop-blur ${ai.color}`}
                 >
-                  <div className="text-xl mb-1">{ai.icon}</div>
+                  <div className="text-lg mb-0.5">{ai.icon}</div>
                   <div className="font-semibold text-xs">{ai.name}</div>
                   <div className="text-xs opacity-70 mt-0.5">{ai.role}</div>
-                  <div className="text-xs opacity-60 mt-1 hidden sm:block">{ai.desc}</div>
+                  <div className="text-[11px] opacity-60 mt-1 hidden sm:block">{ai.desc}</div>
                 </div>
               ))}
             </div>
 
             {/* Form */}
-            <div className="bg-[#08111f]/90 rounded-2xl border border-emerald-300/10 shadow-[0_24px_70px_rgba(0,0,0,0.34)] p-6 sm:p-8">
+            <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-6 sm:p-8">
               <h2 className="text-base font-semibold text-slate-100 mb-6 flex items-center gap-2">
                 <span>📋</span>
                 Yeni Karar Talebi

@@ -129,8 +129,8 @@ export default function ActionButtons({
           disabled={sendingToCC || taskSent || isQueued || pendingStatus !== null}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
             taskSent || isQueued
-              ? "bg-indigo-500 border-indigo-500 text-white shadow-md shadow-indigo-100"
-              : "bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400"
+              ? "bg-gradient-to-r from-emerald-400 to-cyan-400 border-emerald-300 text-slate-950 shadow-sm"
+              : "bg-emerald-400/10 border-emerald-300/25 text-emerald-100 hover:bg-emerald-400/15 hover:border-emerald-300/45"
           }`}
         >
           <span>⚡</span>
@@ -147,8 +147,8 @@ export default function ActionButtons({
           disabled={pendingStatus !== null}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
             isRejected
-              ? "bg-red-500 border-red-500 text-white shadow-md shadow-red-100"
-              : "bg-white border-red-200 text-red-700 hover:bg-red-50 hover:border-red-400"
+              ? "bg-red-500 border-red-400 text-white shadow-sm"
+              : "bg-red-400/10 border-red-300/25 text-red-200 hover:bg-red-400/15 hover:border-red-300/45"
           }`}
         >
           <span>✕</span>
@@ -160,8 +160,8 @@ export default function ActionButtons({
           onClick={() => setShowFollowUp((prev) => !prev)}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all cursor-pointer ml-auto ${
             showFollowUp
-              ? "bg-gray-100 border-gray-300 text-gray-700"
-              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+              ? "bg-slate-700 border-slate-500 text-slate-100"
+              : "bg-slate-900/45 border-slate-600/55 text-slate-300 hover:bg-white/[0.06] hover:border-slate-500"
           }`}
         >
           <span>💬</span>
@@ -170,16 +170,16 @@ export default function ActionButtons({
       </div>
 
       {(updateError || sendToCCError) && (
-        <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+        <p className="text-xs text-red-200 bg-red-400/10 border border-red-300/20 rounded-lg px-3 py-2">
           {updateError || sendToCCError}
         </p>
       )}
 
       {showFollowUp && (
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-            <span className="text-gray-500 text-sm">💬</span>
-            <span className="text-sm font-semibold text-gray-700">Takip Sorusu</span>
+        <div className="rounded-xl border border-slate-600/45 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-600/35 bg-white/[0.035] flex items-center gap-2">
+            <span className="text-slate-400 text-sm">💬</span>
+            <span className="text-sm font-semibold text-slate-100">Takip Sorusu</span>
           </div>
           <div className="p-4 space-y-3">
             <textarea
@@ -187,10 +187,10 @@ export default function ActionButtons({
               onChange={(e) => setFollowUpQuestion(e.target.value)}
               placeholder="Bu karar sonucuna göre ek sorunuzu yazın…"
               rows={3}
-              className="w-full text-sm text-gray-700 border border-gray-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+              className="w-full text-sm text-slate-100 placeholder-slate-500 bg-[#111a2b] border border-slate-600/55 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60"
             />
             {followUpError && (
-              <p className="text-xs text-red-600">{followUpError}</p>
+              <p className="text-xs text-red-300">{followUpError}</p>
             )}
             <div className="flex justify-end gap-2">
               <button
@@ -199,14 +199,14 @@ export default function ActionButtons({
                   setFollowUpQuestion("");
                   setFollowUpError(null);
                 }}
-                className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-700 transition cursor-pointer"
+                className="text-xs px-3 py-1.5 text-slate-400 hover:text-slate-100 transition cursor-pointer"
               >
                 İptal
               </button>
               <button
                 onClick={handleFollowUpSubmit}
                 disabled={followUpLoading || !followUpQuestion.trim()}
-                className="text-xs px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-xs px-4 py-1.5 bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 rounded-lg hover:from-emerald-300 hover:to-cyan-300 transition cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {followUpLoading ? "Yanıtlanıyor…" : "Yanıtla"}
               </button>

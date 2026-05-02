@@ -18,9 +18,9 @@ interface DecisionResultProps {
 }
 
 const PRIORITY_BADGE: Record<string, { label: string; className: string }> = {
-  Kritik: { label: "KRİTİK", className: "bg-red-100 text-red-700 border border-red-200" },
-  Orta: { label: "ORTA", className: "bg-yellow-100 text-yellow-700 border border-yellow-200" },
-  Düşük: { label: "DÜŞÜK", className: "bg-green-100 text-green-700 border border-green-200" },
+  Kritik: { label: "KRİTİK", className: "bg-red-400/10 text-red-200 border border-red-300/25" },
+  Orta: { label: "ORTA", className: "bg-amber-400/10 text-amber-200 border border-amber-300/25" },
+  Düşük: { label: "DÜŞÜK", className: "bg-emerald-400/10 text-emerald-200 border border-emerald-300/25" },
 };
 
 function splitExecutionPlan(plan: string[]): string[] {
@@ -32,9 +32,9 @@ function splitExecutionPlan(plan: string[]): string[] {
 
 function ConfidenceBadge({ score }: { score: number }) {
   const color =
-    score >= 85 ? "bg-green-100 text-green-700" :
-    score >= 70 ? "bg-yellow-100 text-yellow-700" :
-    "bg-red-100 text-red-700";
+    score >= 85 ? "bg-emerald-400/10 text-emerald-200 border border-emerald-300/20" :
+    score >= 70 ? "bg-amber-400/10 text-amber-200 border border-amber-300/20" :
+    "bg-red-400/10 text-red-200 border border-red-300/20";
   return (
     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>
       Güven %{score}
@@ -43,12 +43,12 @@ function ConfidenceBadge({ score }: { score: number }) {
 }
 
 const IMPL_STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  queued:           { label: "Kuyruğa alındı",                  color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  sent:             { label: "Claude Code'a gönderildi",         color: "bg-blue-50 text-blue-700 border-blue-200" },
-  running:          { label: "Çalışıyor",                        color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  completed:        { label: "Tamamlandı ✓",                     color: "bg-green-50 text-green-700 border-green-200" },
-  failed:           { label: "Hata aldı",                        color: "bg-red-50 text-red-700 border-red-200" },
-  review_required:  { label: "Review gerekiyor",                 color: "bg-amber-50 text-amber-700 border-amber-200" },
+  queued:           { label: "Kuyruğa alındı",                  color: "bg-cyan-400/10 text-cyan-200 border-cyan-300/20" },
+  sent:             { label: "Claude Code'a gönderildi",         color: "bg-sky-400/10 text-sky-200 border-sky-300/20" },
+  running:          { label: "Çalışıyor",                        color: "bg-amber-400/10 text-amber-200 border-amber-300/20" },
+  completed:        { label: "Tamamlandı ✓",                     color: "bg-emerald-400/10 text-emerald-200 border-emerald-300/20" },
+  failed:           { label: "Hata aldı",                        color: "bg-red-400/10 text-red-200 border-red-300/20" },
+  review_required:  { label: "Review gerekiyor",                 color: "bg-amber-400/10 text-amber-200 border-amber-300/20" },
 };
 
 export default function DecisionResult({ request, result, onReset }: DecisionResultProps) {
@@ -121,24 +121,24 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h2 className="text-xl font-bold text-gray-900">{request.projectName}</h2>
+            <h2 className="text-xl font-bold text-slate-50">{request.projectName}</h2>
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${badge.className}`}>
               {badge.label}
             </span>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+            <span className="text-xs text-slate-300 bg-slate-800/80 border border-slate-600/45 px-2.5 py-1 rounded-full">
               {request.requestType}
             </span>
             {result.saved === true ? (
-              <span className="text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-medium text-emerald-200 bg-emerald-400/10 border border-emerald-300/25 px-2 py-0.5 rounded-full">
                 Kayıt alındı
               </span>
             ) : (
-              <span className="text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-medium text-slate-400 bg-slate-800/70 border border-slate-600/45 px-2 py-0.5 rounded-full">
                 Kayıt yapılmadı
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             {request.createdAt.toLocaleString("tr-TR", {
               day: "numeric",
               month: "long",
@@ -150,7 +150,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         <div className="flex items-center gap-2">
           <button
             onClick={onReset}
-            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition cursor-pointer whitespace-nowrap"
+            className="text-sm text-slate-400 hover:text-slate-100 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/[0.06] transition cursor-pointer whitespace-nowrap"
           >
             ← Yeni Talep
           </button>
@@ -158,7 +158,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <button
               onClick={handleDelete}
               disabled={isDeleting}
-              className="text-sm text-gray-400 hover:text-red-500 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-red-50 transition cursor-pointer disabled:opacity-50"
+              className="text-sm text-slate-500 hover:text-red-300 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-red-400/10 transition cursor-pointer disabled:opacity-50"
               title="Raporu sil"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -167,19 +167,19 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             </button>
           )}
           {deleteError && (
-            <span className="text-xs text-red-500">{deleteError}</span>
+            <span className="text-xs text-red-300">{deleteError}</span>
           )}
         </div>
       </div>
 
       {/* Nihai Karar — Öne Çıkan Kart */}
-      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-5 text-white">
+      <div className="bg-gradient-to-r from-[#176b63] via-[#157a72] to-[#247f91] rounded-2xl border border-emerald-200/20 p-5 text-white shadow-sm">
         <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-lg">🏆</span>
             <span className="text-sm font-semibold opacity-90">ChatGPT Hakem Kararı</span>
             {result.judgeSource === "live" ? (
-              <span className="text-xs font-semibold bg-green-400/30 text-green-100 border border-green-300/30 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-semibold bg-emerald-300/20 text-emerald-50 border border-emerald-100/30 px-2 py-0.5 rounded-full">
                 Canlı Hakem
               </span>
             ) : (
@@ -202,8 +202,8 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         <DecisionCard title="Uygulanacak Yol" icon="🗺️" badge="Onaylı" badgeColor="green">
           <ol className="space-y-2">
             {splitExecutionPlan(result.finalVerdict.executionPlan).map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center mt-0.5">
+              <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-400/15 text-emerald-200 text-xs font-bold flex items-center justify-center mt-0.5 border border-emerald-300/20">
                   {i + 1}
                 </span>
                 {step}
@@ -211,10 +211,10 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             ))}
           </ol>
           <div className="mt-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Sonraki Aksiyon
             </p>
-            <p className="text-sm text-gray-700 bg-green-50 rounded-lg p-3 border border-green-100">
+            <p className="text-sm text-emerald-100 bg-emerald-400/10 rounded-lg p-3 border border-emerald-300/20">
               {result.finalVerdict.nextAction}
             </p>
           </div>
@@ -224,19 +224,19 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         <DecisionCard title="Riskler & Dikkat Noktaları" icon="⚠️" badge="İncelenmeli" badgeColor="amber">
           <ul className="space-y-2">
             {result.finalVerdict.risks.map((risk, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+              <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
                 <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>
                 {risk}
               </li>
             ))}
           </ul>
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <div className="mt-4 pt-4 border-t border-slate-600/35">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Reddedilen Öneriler
             </p>
             <ul className="space-y-1.5">
               {result.finalVerdict.rejectedSuggestions.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs text-gray-500 line-through">
+                <li key={i} className="flex items-start gap-2 text-xs text-slate-500 line-through">
                   <span className="text-red-400 no-underline">✕</span>
                   {s}
                 </li>
@@ -252,29 +252,29 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         <DecisionCard title="Claude Code Analizi" icon="🤖" badge="Ana Mühendis" badgeColor="indigo">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-500 italic">{claude.title}</p>
+              <p className="text-xs text-slate-500 italic">{claude.title}</p>
               <ConfidenceBadge score={claude.confidenceScore} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 Özet
               </p>
-              <p className="text-sm text-gray-600 leading-relaxed">{claude.summary}</p>
+              <p className="text-sm text-slate-300 leading-relaxed">{claude.summary}</p>
             </div>
-            <div className="pt-3 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+            <div className="pt-3 border-t border-slate-600/35">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 Öneri
               </p>
-              <p className="text-sm text-gray-700 font-medium">{claude.recommendation}</p>
+              <p className="text-sm text-emerald-100 font-medium">{claude.recommendation}</p>
             </div>
             {claude.objections.length > 0 && (
-              <div className="pt-3 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+              <div className="pt-3 border-t border-slate-600/35">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                   İtirazlar
                 </p>
                 <ul className="space-y-1">
                   {claude.objections.map((obj, i) => (
-                    <li key={i} className="text-xs text-gray-500 flex items-start gap-1.5">
+                    <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
                       <span className="text-orange-400 flex-shrink-0">!</span>
                       {obj}
                     </li>
@@ -289,14 +289,14 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         <DecisionCard title="Codex Denetimi" icon="🔍" badge="Kod Denetçisi" badgeColor="violet">
           <div className="space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-1">
-              <p className="text-xs text-gray-500 italic">{codex.title}</p>
+              <p className="text-xs text-slate-500 italic">{codex.title}</p>
               <div className="flex items-center gap-1.5">
                 {result.codexSource === "live" ? (
-                  <span className="text-xs font-semibold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold bg-violet-400/10 text-violet-200 border border-violet-300/20 px-2 py-0.5 rounded-full">
                     Canlı Denetçi
                   </span>
                 ) : (
-                  <span className="text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold bg-slate-800/80 text-slate-400 border border-slate-600/40 px-2 py-0.5 rounded-full">
                     Mock Denetçi
                   </span>
                 )}
@@ -304,29 +304,29 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 Özet
               </p>
-              <p className="text-sm text-gray-600">{codex.summary}</p>
+              <p className="text-sm text-slate-300">{codex.summary}</p>
             </div>
-            <div className="pt-3 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+            <div className="pt-3 border-t border-slate-600/35">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 Riskler
               </p>
               <ul className="space-y-1.5">
                 {codex.risks.map((risk, i) => (
-                  <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                  <li key={i} className="text-xs text-slate-300 flex items-start gap-1.5">
                     <span className="text-amber-400 flex-shrink-0">•</span>
                     {risk}
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="pt-3 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+            <div className="pt-3 border-t border-slate-600/35">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 Alternatif Öneri
               </p>
-              <p className="text-sm text-gray-700 bg-violet-50 rounded-lg p-3 border border-violet-100">
+              <p className="text-sm text-violet-100 bg-violet-400/10 rounded-lg p-3 border border-violet-300/20">
                 {codex.recommendation}
               </p>
             </div>
@@ -335,15 +335,15 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
       </div>
 
       {/* Nihai Rapor */}
-      <div id="verdict-report" className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/60">
+      <div id="verdict-report" className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-600/35 bg-white/[0.035]">
           <div className="flex items-center gap-2">
             <span className="text-base">📄</span>
-            <h3 className="font-semibold text-gray-800 text-sm">Nihai Rapor</h3>
+            <h3 className="font-semibold text-slate-100 text-sm">Nihai Rapor</h3>
           </div>
           <button
             onClick={handlePrint}
-            className="no-print flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-3 py-1.5 rounded-lg transition cursor-pointer"
+            className="no-print flex items-center gap-1.5 text-xs font-medium text-emerald-100 bg-emerald-400/10 hover:bg-emerald-400/15 border border-emerald-300/20 px-3 py-1.5 rounded-lg transition cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -351,83 +351,83 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             PDF İndir
           </button>
         </div>
-        <div className="p-5 space-y-5 text-sm text-gray-700">
+        <div className="p-5 space-y-5 text-sm text-slate-300">
           {/* Talep Özeti */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Talep Özeti</h4>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Talep Özeti</h4>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-              <div><span className="text-gray-400">Proje:</span> <span className="font-medium">{request.projectName}</span></div>
-              <div><span className="text-gray-400">Tip:</span> {request.requestType}</div>
-              <div><span className="text-gray-400">Öncelik:</span> {request.priority}</div>
-              <div><span className="text-gray-400">Çıktı:</span> {request.expectedOutput}</div>
+              <div><span className="text-slate-500">Proje:</span> <span className="font-medium text-slate-100">{request.projectName}</span></div>
+              <div><span className="text-slate-500">Tip:</span> {request.requestType}</div>
+              <div><span className="text-slate-500">Öncelik:</span> {request.priority}</div>
+              <div><span className="text-slate-500">Çıktı:</span> {request.expectedOutput}</div>
             </div>
-            <p className="mt-2 text-gray-600 leading-relaxed">{request.problem}</p>
+            <p className="mt-2 text-slate-300 leading-relaxed">{request.problem}</p>
           </section>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-slate-600/35" />
 
           {/* AI Süreç Özeti */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">AI Süreç Özeti</h4>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">AI Süreç Özeti</h4>
             <div className="flex flex-wrap gap-2">
               {[
                 { label: "Claude Code", source: result.claudeSource },
                 { label: "Codex Denetçi", source: result.codexSource },
                 { label: "ChatGPT Hakem", source: result.judgeSource },
               ].map((ai) => (
-                <span key={ai.label} className={`text-xs px-2.5 py-1 rounded-full font-medium border ${ai.source === "live" ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                <span key={ai.label} className={`text-xs px-2.5 py-1 rounded-full font-medium border ${ai.source === "live" ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20" : "bg-slate-800/70 text-slate-400 border-slate-600/40"}`}>
                   {ai.label} — {ai.source === "live" ? "Canlı" : "Mock"}
                 </span>
               ))}
             </div>
           </section>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-slate-600/35" />
 
           {/* Claude Mühendis */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Claude Code / Ana Mühendis Görüşü</h4>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Claude Code / Ana Mühendis Görüşü</h4>
             <p className="leading-relaxed">{claude.summary}</p>
-            <p className="mt-1.5 text-indigo-700 font-medium">{claude.recommendation}</p>
+            <p className="mt-1.5 text-emerald-100 font-medium">{claude.recommendation}</p>
           </section>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-slate-600/35" />
 
           {/* Codex */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Codex / Denetçi Görüşü</h4>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Codex / Denetçi Görüşü</h4>
             <p className="leading-relaxed">{codex.summary}</p>
-            <p className="mt-1.5 text-violet-700 font-medium">{codex.recommendation}</p>
+            <p className="mt-1.5 text-cyan-100 font-medium">{codex.recommendation}</p>
           </section>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-slate-600/35" />
 
           {/* ChatGPT Hakem */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">ChatGPT / Hakem Kararı</h4>
-            <p className="font-semibold text-gray-900 leading-relaxed">{result.finalVerdict.verdict}</p>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">ChatGPT / Hakem Kararı</h4>
+            <p className="font-semibold text-slate-50 leading-relaxed">{result.finalVerdict.verdict}</p>
           </section>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-slate-600/35" />
 
           {/* Uygulanacak Yol */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Uygulanacak Yol</h4>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Uygulanacak Yol</h4>
             <ol className="space-y-1.5 list-none">
               {splitExecutionPlan(result.finalVerdict.executionPlan).map((step, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center mt-0.5">{i+1}</span>
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-400/15 text-emerald-200 text-xs font-bold flex items-center justify-center mt-0.5 border border-emerald-300/20">{i+1}</span>
                   <span className="leading-relaxed">{step}</span>
                 </li>
               ))}
             </ol>
           </section>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-slate-600/35" />
 
           {/* Riskler */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Riskler</h4>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Riskler</h4>
             <ul className="space-y-1">
               {result.finalVerdict.risks.map((r, i) => (
                 <li key={i} className="flex items-start gap-2"><span className="text-amber-500 flex-shrink-0">•</span>{r}</li>
@@ -435,37 +435,37 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             </ul>
           </section>
 
-          <div className="border-t border-gray-100" />
+          <div className="border-t border-slate-600/35" />
 
           {/* Sonraki Aksiyon */}
           <section>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Sonraki Aksiyon</h4>
-            <p className="font-medium text-gray-800 bg-green-50 rounded-lg px-4 py-3 border border-green-100">{result.finalVerdict.nextAction}</p>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Sonraki Aksiyon</h4>
+            <p className="font-medium text-emerald-100 bg-emerald-400/10 rounded-lg px-4 py-3 border border-emerald-300/20">{result.finalVerdict.nextAction}</p>
           </section>
 
           {/* Referans Dosyalar */}
           {request.attachments && request.attachments.length > 0 && (
             <>
-              <div className="border-t border-gray-100" />
+              <div className="border-t border-slate-600/35" />
               <section>
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Eklenen Referans Dosyalar</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Eklenen Referans Dosyalar</h4>
                 <ul className="space-y-2">
                   {request.attachments.map((att) => (
-                    <li key={att.id} className="text-xs text-gray-600 border border-gray-100 rounded-lg p-3">
+                    <li key={att.id} className="text-xs text-slate-300 border border-slate-600/35 rounded-lg p-3 bg-slate-900/35">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-gray-400">📎</span>
-                        <span className="font-medium text-gray-800">{att.name}</span>
-                        <span className="text-gray-400">{att.type.split("/")[1]?.toUpperCase()} · {(att.size/1024).toFixed(0)} KB</span>
+                        <span className="text-emerald-200/80">📎</span>
+                        <span className="font-medium text-slate-100">{att.name}</span>
+                        <span className="text-slate-500">{att.type.split("/")[1]?.toUpperCase()} · {(att.size/1024).toFixed(0)} KB</span>
                         <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full border ${
                           att.analysisStatus === "content_extracted"
-                            ? "bg-green-50 text-green-700 border-green-200"
+                            ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20"
                             : att.analysisStatus === "metadata_only"
-                            ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                            ? "bg-amber-400/10 text-amber-200 border-amber-300/20"
                             : att.analysisStatus === "unsupported" && att.type === "application/pdf"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            ? "bg-amber-400/10 text-amber-200 border-amber-300/20"
                             : att.analysisStatus === "error"
-                            ? "bg-red-50 text-red-600 border-red-200"
-                            : "bg-gray-50 text-gray-500 border-gray-200"
+                            ? "bg-red-400/10 text-red-200 border-red-300/20"
+                            : "bg-slate-800/70 text-slate-400 border-slate-600/40"
                         }`}>
                           {att.analysisStatus === "content_extracted"
                             ? att.visionStatus === "analyzed"
@@ -480,23 +480,23 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                         </span>
                       </div>
                       {att.analysisStatus === "content_extracted" && att.visionStatus === "analyzed" && att.contentSummary && (
-                        <p className="mt-2 text-gray-600 bg-blue-50 rounded p-2 text-[12px] leading-relaxed border border-blue-100">
-                          <span className="font-medium text-blue-700 block mb-0.5">Görsel analizi:</span>
+                        <p className="mt-2 text-slate-300 bg-cyan-400/10 rounded p-2 text-[12px] leading-relaxed border border-cyan-300/20">
+                          <span className="font-medium text-cyan-100 block mb-0.5">Görsel analizi:</span>
                           {att.contentSummary.slice(0, 400)}{att.contentSummary.length > 400 ? "…" : ""}
                         </p>
                       )}
                       {att.analysisStatus === "content_extracted" && att.contentText && (
-                        <p className="mt-2 text-gray-500 bg-gray-50 rounded p-2 font-mono text-[11px] leading-relaxed break-all">
+                        <p className="mt-2 text-slate-400 bg-slate-950/35 rounded p-2 font-mono text-[11px] leading-relaxed break-all">
                           {att.contentText.slice(0, 300)}{att.contentText.length > 300 ? "…" : ""}
                         </p>
                       )}
                       {att.analysisStatus === "unsupported" && att.type === "application/pdf" && (
-                        <p className="mt-1.5 text-amber-700 bg-amber-50 border border-amber-100 rounded p-2 text-[12px] leading-relaxed">
+                        <p className="mt-1.5 text-amber-200 bg-amber-400/10 border border-amber-300/20 rounded p-2 text-[12px] leading-relaxed">
                           PDF içeriğini analiz ettirmek için metni TXT veya Markdown olarak ekleyin.
                         </p>
                       )}
                       {att.analysisStatus === "metadata_only" && (
-                        <p className="mt-1.5 text-gray-400 italic">
+                        <p className="mt-1.5 text-slate-500 italic">
                           Bu dosyanın içeriği henüz okunmadı; sadece dosya bilgisi referans olarak kullanıldı.
                         </p>
                       )}
@@ -511,8 +511,8 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
 
       {/* Uygulama Durumu */}
       {implementationTask && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
             <span>⚡</span> Uygulama Durumu
           </h3>
           <div className="space-y-3">
@@ -525,11 +525,11 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                   </span>
                 );
               })()}
-              <span className="text-xs text-gray-400 font-mono">
+              <span className="text-xs text-slate-500 font-mono">
                 #{implementationTask.taskId.slice(0, 8)}
               </span>
             </div>
-            <p className="text-sm font-medium text-gray-700">{implementationTask.promptTitle}</p>
+            <p className="text-sm font-medium text-slate-200">{implementationTask.promptTitle}</p>
             <div className="flex items-center gap-2">
               <button
                 onClick={async () => {
@@ -537,7 +537,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                   setCopiedPrompt(true);
                   setTimeout(() => setCopiedPrompt(false), 2000);
                 }}
-                className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition cursor-pointer font-medium"
+                className="text-xs px-3 py-1.5 bg-emerald-400/10 text-emerald-100 border border-emerald-300/20 rounded-lg hover:bg-emerald-400/15 transition cursor-pointer font-medium"
               >
                 {copiedPrompt ? "Kopyalandı ✓" : "Prompt'u Kopyala"}
               </button>
@@ -548,16 +548,16 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
 
       {/* Takip Soruları */}
       {followUps.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
             <span>💬</span> Takip Soruları
           </h3>
           <div className="space-y-4">
             {followUps.map((fu) => (
-              <div key={fu.id} className="border border-gray-100 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100">
-                  <p className="text-sm font-medium text-gray-800">{fu.question}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+              <div key={fu.id} className="border border-slate-600/40 rounded-xl overflow-hidden">
+                <div className="bg-white/[0.035] px-4 py-2.5 border-b border-slate-600/35">
+                  <p className="text-sm font-medium text-slate-100">{fu.question}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     {fu.createdAt.toLocaleString("tr-TR", {
                       day: "numeric",
                       month: "long",
@@ -567,7 +567,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                   </p>
                 </div>
                 <div className="px-4 py-3">
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{fu.answer}</p>
+                  <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{fu.answer}</p>
                 </div>
               </div>
             ))}
@@ -576,8 +576,8 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
       )}
 
       {/* Aksiyon Butonları */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <div className="bg-[#182235]/92 rounded-2xl border border-slate-600/40 shadow-sm p-5">
+        <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
           <span>⚡</span> Aksiyonlar
         </h3>
         <ActionButtons
