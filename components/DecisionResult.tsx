@@ -364,6 +364,62 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <p className="mt-2 text-slate-300 leading-relaxed">{request.problem}</p>
           </section>
 
+          {/* Kod Bağlamı — GitHub repo okuma sonucu (FAZ 2A) */}
+          {result.repoContext && (() => {
+            const rc = result.repoContext;
+            const hasError = !!rc.errorMessage;
+            return (
+              <>
+                <div className="border-t border-slate-600/35" />
+                <section>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Kod Bağlamı</h4>
+                  {hasError ? (
+                    <p className="text-sm text-amber-200 bg-amber-400/10 border border-amber-300/25 rounded-lg px-3 py-2">
+                      Kod bağlamı alınamadı. Analiz açıklama ve ek dosyalara göre yapılmıştır.
+                      <span className="block mt-1 text-xs text-amber-200/80">{rc.errorMessage}</span>
+                    </p>
+                  ) : (
+                    <div className="space-y-2 text-sm">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                        <div><span className="text-slate-500">GitHub Repo:</span> <span className="font-medium text-slate-100">{rc.owner}/{rc.repo}</span></div>
+                        <div><span className="text-slate-500">Branch:</span> <span className="font-medium text-slate-100">{rc.branch}</span></div>
+                        <div><span className="text-slate-500">Okunan dosya:</span> <span className="font-medium text-slate-100">{rc.selectedFiles.length}</span></div>
+                        <div><span className="text-slate-500">Çekilme:</span> <span className="text-slate-300 text-xs">{new Date(rc.fetchedAt).toLocaleString("tr-TR")}</span></div>
+                      </div>
+
+                      {rc.selectedFiles.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs text-slate-500 mb-1.5">Seçilen dosyalar:</p>
+                          <ul className="space-y-1">
+                            {rc.selectedFiles.map((f) => (
+                              <li key={f.path} className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
+                                <span className="text-emerald-200/80">📄</span>
+                                <span className="font-mono">{f.path}</span>
+                                <span className="text-slate-500">{f.language} · {(f.size / 1024).toFixed(1)} KB</span>
+                                {f.reason && <span className="text-slate-500 italic">({f.reason})</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {rc.warnings.length > 0 && (
+                        <div className="mt-2 text-xs text-amber-200 bg-amber-400/10 border border-amber-300/25 rounded-lg px-3 py-2">
+                          <p className="font-semibold mb-0.5">Uyarılar:</p>
+                          <ul className="space-y-0.5">
+                            {rc.warnings.map((w, i) => (
+                              <li key={i}>• {w}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </section>
+              </>
+            );
+          })()}
+
           {/* Proje Bağlamı — sadece dolu alanlar */}
           {request.projectContext && (() => {
             const ctx = request.projectContext;

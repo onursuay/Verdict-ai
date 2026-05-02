@@ -115,6 +115,25 @@ export interface DecisionRequest {
 
 export type AnalysisSource = "mock" | "live";
 
+export interface RepoSelectedFile {
+  path: string;
+  size: number;
+  language: string;
+  reason: string;
+  contentPreview: string;
+}
+
+export interface RepoContextSource {
+  source: "github";
+  owner: string;
+  repo: string;
+  branch: string;
+  selectedFiles: RepoSelectedFile[];
+  warnings: string[];
+  fetchedAt: string; // ISO timestamp
+  errorMessage?: string;
+}
+
 export interface DecisionResult {
   requestId: string;
   analyses: AIAnalysis[];
@@ -128,4 +147,5 @@ export interface DecisionResult {
   recordId?: string;
   enrichedAttachments?: DecisionAttachment[];
   followUps?: DecisionFollowUp[];
+  repoContext?: RepoContextSource;
 }

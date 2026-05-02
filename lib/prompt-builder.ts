@@ -1,4 +1,4 @@
-import { AIAnalysis, DecisionAttachment, DecisionRequest, FinalVerdict, PromptOutput, RequestType } from "@/types/decision";
+import { AIAnalysis, DecisionAttachment, DecisionRequest, FinalVerdict, PromptOutput, RepoContextSource, RequestType } from "@/types/decision";
 
 function buildTypeSection(requestType: RequestType | string): string {
   switch (requestType) {
@@ -146,6 +146,23 @@ function buildReportFormat(requestType: RequestType | string): string {
   }
 }
 
+function buildRepoContextSection(repoContext: RepoContextSource | null | undefined, hasLocalPath: boolean): string {
+  if (!repoContext) return "";
+  if (repoContext.errorMessage) {
+    return `\n\n## GitHub Kod Bağlamı\n_GitHub kod bağlamı alınamadı: ${repoContext.errorMessage}_`;
+  }
+  if (!repoContext.selectedFiles.length) {
+    return `\n\n## GitHub Kod Bağlamı\n- Repo: ${repoContext.owner}/${repoContext.repo}\n- Branch: ${repoContext.branch}\n_Alakalı text/code dosyası bulunamadı._`;
+  }
+  const fileList = repoContext.selectedFiles
+    .map((f) => `- ${f.path} (${f.language}, ~${(f.size / 1024).toFixed(1)} KB)`)
+    .join("\n");
+  const localNote = hasLocalPath
+    ? `\n\n_Uygulama için lokal proje yolu önceliklidir. GitHub bağlamı referans olarak kullanılmıştır._`
+    : "";
+  return `\n\n## GitHub Kod Bağlamı\n- Repo: ${repoContext.owner}/${repoContext.repo}\n- Branch: ${repoContext.branch}\n- İncelenen dosyalar:\n${fileList}${localNote}`;
+}
+
 function buildProjectContextSection(req: DecisionRequest): string {
   const ctx = req.projectContext;
   const hasContext = !!ctx && (
@@ -193,7 +210,8 @@ export function generatePromptOutput(
   claude: AIAnalysis,
   codex: AIAnalysis,
   verdict: FinalVerdict,
-  attachments: DecisionAttachment[]
+  attachments: DecisionAttachment[],
+  repoContext?: RepoContextSource | null
 ): PromptOutput {
   const isCoinBot = /coinbot|coin[_\s-]?bot/i.test(req.projectName);
 
@@ -231,6 +249,7 @@ export function generatePromptOutput(
   const safetySection = isCoinBot ? buildCoinBotSafety() : "";
   const reportSection = buildReportFormat(req.requestType);
   const projectContextSection = buildProjectContextSection(req);
+  const repoContextSection = buildRepoContextSection(repoContext, !!req.projectContext?.localProjectPath?.trim());
 
   const body =
 `# ${req.requestType} — ${req.projectName}
@@ -240,7 +259,7 @@ export function generatePromptOutput(
 - Talep Tipi: ${req.requestType}
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
-- Beklenen Çıktı: ${req.expectedOutput}${req.repoRequired ? "\n- Repo: Erişim gerekli" : ""}${projectContextSection}
+- Beklenen Çıktı: ${req.expectedOutput}${req.repoRequired ? "\n- Repo: Erişim gerekli" : ""}${projectContextSection}${repoContextSection}
 
 ## Nihai Karar (Hakem)
 ${verdict.verdict}

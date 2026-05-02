@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { AIAnalysis, AnalysisSource, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict } from "@/types/decision";
+import { AIAnalysis, AnalysisSource, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict, RepoContextSource } from "@/types/decision";
 import { generateMockDecision } from "@/lib/mock-decision";
 import { generatePromptOutput } from "@/lib/prompt-builder";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { buildRepoContext } from "@/lib/github/build-repo-context";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,20 @@ function cleanExtractedText(text: string): string {
       .slice(0, 15000);
   }
   return text;
+}
+
+function buildGithubContextBlock(meta: RepoContextSource | null, contextText: string): string {
+  if (!meta) return "";
+  if (meta.errorMessage) {
+    return `\n\nGITHUB KOD BAĞLAMI:\nGitHub kod bağlamı alınamadı (${meta.errorMessage}). Kod analizi sınırlıdır; yalnızca yazılı problem tanımına ve eklenen referans dosyalara dayan.`;
+  }
+  if (!meta.selectedFiles.length || !contextText.trim()) {
+    return `\n\nGITHUB KOD BAĞLAMI:\nGitHub repo bağlandı (${meta.owner}/${meta.repo} @ ${meta.branch}) ancak okunabilir alakalı dosya bulunamadı. Kod analizi sınırlıdır.`;
+  }
+  const fileList = meta.selectedFiles
+    .map((f) => `- ${f.path} (${f.language}, ~${(f.size / 1024).toFixed(1)} KB)`)
+    .join("\n");
+  return `\n\nGITHUB KOD BAĞLAMI:\n- Repo: ${meta.owner}/${meta.repo}\n- Branch: ${meta.branch}\n- Seçilen dosyalar:\n${fileList}\n\nDosya içerikleri:\n${contextText}\n\nÖNEMLİ: Bu dosya içerikleri GitHub'dan okunmuştur. Kod analizi yaparken yalnızca burada görülen dosyalara dayan; görmediğin dosyalar hakkında kesin hüküm verme. Tahmin yerine "bu dosya bağlamda yok" demeyi tercih et.`;
 }
 
 function buildProjectContextBlock(req: DecisionRequest): string {
@@ -168,7 +183,7 @@ function stripDataUrls(attachments: DecisionAttachment[]): DecisionAttachment[] 
 
 // ─── Claude prompt & parser ──────────────────────────────────────────────────
 
-function buildClaudePrompt(req: DecisionRequest): string {
+function buildClaudePrompt(req: DecisionRequest, githubBlock: string): string {
   return `Sen deneyimli bir yazılım mühendisi ve teknik mimarısın. Aşağıdaki yazılım talebini analiz et ve sonucu SADECE geçerli JSON formatında ver.
 
 TALEP:
@@ -177,7 +192,7 @@ TALEP:
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
 - Beklenen Çıktı: ${req.expectedOutput}
-- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}${buildProjectContextBlock(req)}
+- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}${buildProjectContextBlock(req)}${githubBlock}
 
 Yanıtın yalnızca aşağıdaki JSON yapısından oluşmalı; başka hiçbir metin ekleme:
 
@@ -223,7 +238,7 @@ function parseClaudeAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
 
 // ─── OpenAI codex prompt & parser ───────────────────────────────────────────
 
-function buildCodexPrompt(req: DecisionRequest, claude: AIAnalysis): string {
+function buildCodexPrompt(req: DecisionRequest, claude: AIAnalysis, githubBlock: string): string {
   return `Sen kıdemli bir kod denetçisi ve ikinci mühendissin. Ana görevin uygulanabilirlik, kod riski, test riski, regression riski, gereksiz refactor riski ve edge-case tespitidir. Kod yazma; yalnızca karar analizi üret.
 
 Aşağıdaki yazılım talebini ve ana mühendis analizini incele, bağımsız bir kod denetimi yap. Sonucu SADECE geçerli JSON formatında ver.
@@ -234,7 +249,7 @@ TALEP:
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
 - Beklenen Çıktı: ${req.expectedOutput}
-- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}${buildProjectContextBlock(req)}
+- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}${buildProjectContextBlock(req)}${githubBlock}
 
 ANA MÜHENDİS (CLAUDE) ANALİZİ:
 - Özet: ${claude.summary}
@@ -291,7 +306,8 @@ function parseCodexAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
 function buildJudgePrompt(
   req: DecisionRequest,
   claude: AIAnalysis,
-  codex: AIAnalysis
+  codex: AIAnalysis,
+  githubBlock: string
 ): string {
   return `Sen yazılım mühendisliği kararlarında hakem rolünde deneyimli bir teknik direktörüsün. Aşağıdaki talep ve iki bağımsız AI analizini değerlendirip SADECE geçerli JSON formatında final karar ver.
 
@@ -300,7 +316,7 @@ TALEP:
 - Talep Tipi: ${req.requestType}
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
-- Beklenen Çıktı: ${req.expectedOutput}${buildProjectContextBlock(req)}
+- Beklenen Çıktı: ${req.expectedOutput}${buildProjectContextBlock(req)}${githubBlock}
 
 CLAUDE MÜHENDİS ANALİZİ:
 - Özet: ${claude.summary}
@@ -397,6 +413,45 @@ export async function POST(req: NextRequest) {
   // request içindeki attachments'ı işlenmiş (dataUrl olmayan) versiyonla güncelle
   const enrichedRequest: DecisionRequest = { ...request, attachments: processedAttachments };
 
+  // Pre-step: GitHub repo context (FAZ 2A) — repoRequired=true ve GitHub URL varsa.
+  let repoContext: RepoContextSource | null = null;
+  let githubBlock = "";
+  if (enrichedRequest.repoRequired && enrichedRequest.projectContext?.githubRepoUrl?.trim()) {
+    try {
+      const built = await buildRepoContext({
+        githubRepoUrl: enrichedRequest.projectContext.githubRepoUrl,
+        problem: enrichedRequest.problem,
+        requestType: enrichedRequest.requestType,
+        projectName: enrichedRequest.projectName,
+      });
+      repoContext = built.meta;
+      githubBlock = buildGithubContextBlock(built.meta, built.contextText);
+      console.log("[verdict-ai] github context", {
+        owner: built.meta.owner,
+        repo: built.meta.repo,
+        branch: built.meta.branch,
+        files: built.meta.selectedFiles.length,
+        chars: built.contextText.length,
+        warnings: built.meta.warnings.length,
+        error: built.meta.errorMessage ?? null,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "bilinmeyen hata";
+      console.warn("[verdict-ai] github context error:", msg);
+      repoContext = {
+        source: "github",
+        owner: "",
+        repo: "",
+        branch: "",
+        selectedFiles: [],
+        warnings: [],
+        fetchedAt: new Date().toISOString(),
+        errorMessage: "GitHub kod bağlamı alınamadı.",
+      };
+      githubBlock = buildGithubContextBlock(repoContext, "");
+    }
+  }
+
   const mockResult = generateMockDecision(enrichedRequest);
   const mockClaudeAnalysis = mockResult.analyses.find((a) => a.role === "claude_engineer")!;
   const mockCodexAnalysis = mockResult.analyses.find((a) => a.role === "codex_reviewer")!;
@@ -411,7 +466,7 @@ export async function POST(req: NextRequest) {
       const message = await anthropic.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: 1024,
-        messages: [{ role: "user", content: buildClaudePrompt(enrichedRequest) }],
+        messages: [{ role: "user", content: buildClaudePrompt(enrichedRequest, githubBlock) }],
       });
       const text = message.content[0].type === "text" ? message.content[0].text : "";
       claudeAnalysis = parseClaudeAnalysis(text, mockClaudeAnalysis);
@@ -431,7 +486,7 @@ export async function POST(req: NextRequest) {
       const codexCompletion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         max_tokens: 1024,
-        messages: [{ role: "user", content: buildCodexPrompt(enrichedRequest, claudeAnalysis) }],
+        messages: [{ role: "user", content: buildCodexPrompt(enrichedRequest, claudeAnalysis, githubBlock) }],
       });
       const codexText = codexCompletion.choices[0]?.message?.content ?? "";
       codexAnalysis = parseCodexAnalysis(codexText, mockCodexAnalysis);
@@ -451,7 +506,7 @@ export async function POST(req: NextRequest) {
       const judgeCompletion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         max_tokens: 1024,
-        messages: [{ role: "user", content: buildJudgePrompt(enrichedRequest, claudeAnalysis, codexAnalysis) }],
+        messages: [{ role: "user", content: buildJudgePrompt(enrichedRequest, claudeAnalysis, codexAnalysis, githubBlock) }],
       });
       const judgeText = judgeCompletion.choices[0]?.message?.content ?? "";
       finalVerdict = parseJudgeVerdict(judgeText, mockResult.finalVerdict);
@@ -466,7 +521,8 @@ export async function POST(req: NextRequest) {
     claudeAnalysis,
     codexAnalysis,
     finalVerdict,
-    processedAttachments
+    processedAttachments,
+    repoContext
   );
 
   const finalResult: DecisionResult = {
@@ -481,6 +537,7 @@ export async function POST(req: NextRequest) {
     claudeSource,
     codexSource,
     judgeSource,
+    ...(repoContext ? { repoContext } : {}),
   };
 
   // Step 4: Supabase kayıt (env yoksa veya hata olursa sessizce atla)

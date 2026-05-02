@@ -358,6 +358,11 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                 placeholder="https://github.com/onursuay/coinbot"
                 className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
               />
+              {projectContext.githubRepoUrl?.trim() && (
+                <p className="mt-1 text-xs text-emerald-200/85">
+                  GitHub repo verildi. Analiz sırasında ilgili dosyalar okunmaya çalışılacak.
+                </p>
+              )}
             </div>
 
             <div>
