@@ -29,6 +29,37 @@ function cleanExtractedText(text: string): string {
   return text;
 }
 
+function buildProjectContextBlock(req: DecisionRequest): string {
+  const ctx = req.projectContext;
+  const hasContext = !!ctx && (
+    !!ctx.githubRepoUrl ||
+    !!ctx.localProjectPath ||
+    !!ctx.liveUrl ||
+    !!ctx.vercelProjectUrl ||
+    !!ctx.vpsHost ||
+    !!ctx.supabaseProjectUrl ||
+    !!ctx.notes
+  );
+
+  // Repo analizi istendi ama bağlam verilmedi → AI'a açıkça uyarı.
+  if (req.repoRequired && !hasContext) {
+    return `\n\nPROJE BAĞLAMI:\nRepo analizi istendi ancak GitHub repo URL'i veya lokal proje yolu sağlanmadı. Kod erişimi doğrulanmadan kesin kod analizi yapma; yalnızca yazılı problem tanımı ve eklenen referans dosyalar üzerinden çalış.`;
+  }
+
+  if (!hasContext) return "";
+
+  const lines: string[] = [];
+  if (ctx?.githubRepoUrl) lines.push(`- GitHub Repo: ${ctx.githubRepoUrl} (kod incelemesi için hedef repo budur)`);
+  if (ctx?.localProjectPath) lines.push(`- Lokal Proje Yolu: ${ctx.localProjectPath} (kullanıcının yerel proje klasörü)`);
+  if (ctx?.liveUrl) lines.push(`- Canlı URL: ${ctx.liveUrl} (canlı ortam)`);
+  if (ctx?.vercelProjectUrl) lines.push(`- Vercel: ${ctx.vercelProjectUrl} (deploy ortamı)`);
+  if (ctx?.vpsHost) lines.push(`- VPS / Worker: ${ctx.vpsHost} (runtime/worker bu ortamda)`);
+  if (ctx?.supabaseProjectUrl) lines.push(`- Supabase: ${ctx.supabaseProjectUrl} (veritabanı bağlamı)`);
+  if (ctx?.notes) lines.push(`- Notlar: ${ctx.notes}`);
+
+  return `\n\nPROJE BAĞLAMI:\n${lines.join("\n")}`;
+}
+
 function buildAttachmentContext(attachments?: DecisionAttachment[]): string {
   if (!attachments?.length) return "";
   const lines = attachments.map(a => {
@@ -146,7 +177,7 @@ TALEP:
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
 - Beklenen Çıktı: ${req.expectedOutput}
-- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}
+- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}${buildProjectContextBlock(req)}
 
 Yanıtın yalnızca aşağıdaki JSON yapısından oluşmalı; başka hiçbir metin ekleme:
 
@@ -203,7 +234,7 @@ TALEP:
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
 - Beklenen Çıktı: ${req.expectedOutput}
-- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}
+- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}${buildProjectContextBlock(req)}
 
 ANA MÜHENDİS (CLAUDE) ANALİZİ:
 - Özet: ${claude.summary}
@@ -269,7 +300,7 @@ TALEP:
 - Talep Tipi: ${req.requestType}
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
-- Beklenen Çıktı: ${req.expectedOutput}
+- Beklenen Çıktı: ${req.expectedOutput}${buildProjectContextBlock(req)}
 
 CLAUDE MÜHENDİS ANALİZİ:
 - Özet: ${claude.summary}

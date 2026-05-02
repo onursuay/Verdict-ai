@@ -89,6 +89,16 @@ export interface PromptOutput {
   expectedReportFormat?: string[];
 }
 
+export interface ProjectContext {
+  githubRepoUrl?: string;
+  localProjectPath?: string;
+  liveUrl?: string;
+  vercelProjectUrl?: string;
+  vpsHost?: string;
+  supabaseProjectUrl?: string;
+  notes?: string;
+}
+
 export interface DecisionRequest {
   id: string;
   projectName: string;
@@ -100,6 +110,7 @@ export interface DecisionRequest {
   createdAt: Date;
   status: DecisionStatus;
   attachments?: DecisionAttachment[];
+  projectContext?: ProjectContext;
 }
 
 export type AnalysisSource = "mock" | "live";

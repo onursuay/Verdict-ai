@@ -364,6 +364,42 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <p className="mt-2 text-slate-300 leading-relaxed">{request.problem}</p>
           </section>
 
+          {/* Proje Bağlamı — sadece dolu alanlar */}
+          {request.projectContext && (() => {
+            const ctx = request.projectContext;
+            const rows: Array<[string, string]> = [];
+            if (ctx.githubRepoUrl) rows.push(["GitHub Repo", ctx.githubRepoUrl]);
+            if (ctx.localProjectPath) rows.push(["Lokal Yol", ctx.localProjectPath]);
+            if (ctx.liveUrl) rows.push(["Canlı URL", ctx.liveUrl]);
+            if (ctx.vercelProjectUrl) rows.push(["Vercel", ctx.vercelProjectUrl]);
+            if (ctx.vpsHost) rows.push(["VPS / Worker", ctx.vpsHost]);
+            if (ctx.supabaseProjectUrl) rows.push(["Supabase", ctx.supabaseProjectUrl]);
+            if (ctx.notes) rows.push(["Not", ctx.notes]);
+            if (!rows.length) return null;
+            return (
+              <>
+                <div className="border-t border-slate-600/35" />
+                <section>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Proje Bağlamı</h4>
+                  <ul className="space-y-1.5 text-sm">
+                    {rows.map(([label, value]) => (
+                      <li key={label} className="flex flex-wrap gap-x-2">
+                        <span className="text-slate-500 min-w-[110px]">{label}:</span>
+                        {/^https?:\/\//.test(value) ? (
+                          <a href={value} target="_blank" rel="noreferrer" className="text-emerald-200 hover:text-emerald-100 break-all underline-offset-2 hover:underline">
+                            {value}
+                          </a>
+                        ) : (
+                          <span className="text-slate-200 break-all">{value}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </>
+            );
+          })()}
+
           <div className="border-t border-slate-600/35" />
 
           {/* AI Süreç Özeti */}

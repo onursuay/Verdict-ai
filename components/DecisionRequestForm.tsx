@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { DecisionAttachment, DecisionRequest, ExpectedOutput, Priority, RequestType } from "@/types/decision";
+import { DecisionAttachment, DecisionRequest, ExpectedOutput, Priority, ProjectContext, RequestType } from "@/types/decision";
 
 interface DecisionRequestFormProps {
   onSubmit: (request: DecisionRequest) => void;
@@ -49,7 +49,30 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [problem, setProblem] = useState("");
   const [repoRequired, setRepoRequired] = useState(false);
   const [attachments, setAttachments] = useState<DecisionAttachment[]>([]);
+  const [projectContext, setProjectContext] = useState<ProjectContext>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const updateContext = (key: keyof ProjectContext, value: string) => {
+    setProjectContext((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const sanitizedContext = (): ProjectContext | undefined => {
+    const trimmed: ProjectContext = {};
+    (Object.keys(projectContext) as Array<keyof ProjectContext>).forEach((k) => {
+      const v = projectContext[k]?.trim();
+      if (v) trimmed[k] = v;
+    });
+    return Object.keys(trimmed).length ? trimmed : undefined;
+  };
+
+  const hasAnyContext =
+    !!projectContext.githubRepoUrl?.trim() ||
+    !!projectContext.localProjectPath?.trim() ||
+    !!projectContext.liveUrl?.trim() ||
+    !!projectContext.vercelProjectUrl?.trim() ||
+    !!projectContext.vpsHost?.trim() ||
+    !!projectContext.supabaseProjectUrl?.trim() ||
+    !!projectContext.notes?.trim();
 
   const ALLOWED_TYPES = ["image/png","image/jpeg","image/webp","application/pdf","text/plain","application/json","text/markdown"];
   const TEXT_TYPES = ["text/plain", "application/json", "text/markdown"];
@@ -128,6 +151,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       createdAt: new Date(),
       status: "analyzing",
       attachments,
+      projectContext: sanitizedContext(),
     };
 
     onSubmit(request);
@@ -299,11 +323,111 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           <span className="text-slate-500 text-xs font-normal">
             AI karar verirken GitHub repo/kod bağlamı gerekiyorsa açın.
           </span>
-          <span className="text-xs font-medium text-slate-300 bg-slate-700/70 border border-slate-500/50 px-2 py-0.5 rounded-full">
-            Hazırlık
-          </span>
         </span>
       </div>
+
+      {/* Proje Bağlamı — sadece repoRequired açıkken */}
+      {repoRequired && (
+        <div className="space-y-3 p-4 bg-slate-700/30 rounded-lg border border-slate-500/45">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">Proje Bağlamı</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Doldurulan alanlar AI promptlarına dahil edilir. Hepsi opsiyoneldir.
+              </p>
+            </div>
+            <span className="text-xs font-medium text-emerald-200 bg-emerald-400/10 border border-emerald-300/25 px-2 py-0.5 rounded-full">
+              Repo bağlamı
+            </span>
+          </div>
+
+          {!hasAnyContext && (
+            <div className="text-xs text-amber-200 bg-amber-400/10 border border-amber-300/25 rounded-lg px-3 py-2">
+              Kod deposu analizi istendi ancak GitHub repo veya proje yolu belirtilmedi.
+              AI bu durumda yalnızca yazılı açıklama ve ek dosyaları analiz eder.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">GitHub Repo URL</label>
+              <input
+                type="url"
+                value={projectContext.githubRepoUrl ?? ""}
+                onChange={(e) => updateContext("githubRepoUrl", e.target.value)}
+                placeholder="https://github.com/onursuay/coinbot"
+                className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Lokal Proje Yolu</label>
+              <input
+                type="text"
+                value={projectContext.localProjectPath ?? ""}
+                onChange={(e) => updateContext("localProjectPath", e.target.value)}
+                placeholder="/Users/onursuay/Desktop/Onur Suay/Web Siteleri/coinbot"
+                className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Canlı Site URL</label>
+              <input
+                type="url"
+                value={projectContext.liveUrl ?? ""}
+                onChange={(e) => updateContext("liveUrl", e.target.value)}
+                placeholder="https://coin.onursuay.com"
+                className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Vercel Project URL</label>
+              <input
+                type="url"
+                value={projectContext.vercelProjectUrl ?? ""}
+                onChange={(e) => updateContext("vercelProjectUrl", e.target.value)}
+                placeholder="https://vercel.com/onur-suay/coinbot"
+                className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">VPS / Worker Bilgisi</label>
+              <input
+                type="text"
+                value={projectContext.vpsHost ?? ""}
+                onChange={(e) => updateContext("vpsHost", e.target.value)}
+                placeholder="Hostinger VPS, Docker worker, /opt/coinbot"
+                className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Supabase Project URL</label>
+              <input
+                type="url"
+                value={projectContext.supabaseProjectUrl ?? ""}
+                onChange={(e) => updateContext("supabaseProjectUrl", e.target.value)}
+                placeholder="https://supabase.com/dashboard/project/..."
+                className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Ek Not</label>
+            <textarea
+              value={projectContext.notes ?? ""}
+              onChange={(e) => updateContext("notes", e.target.value)}
+              placeholder="Branch adı, deployment ortamı, kritik kısıtlar veya AI'a iletilmesi gereken diğer bağlam bilgisi…"
+              rows={2}
+              className="w-full px-3 py-2 rounded-lg border border-slate-500/55 bg-[#202b40] text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition resize-none"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Submit */}
       <button

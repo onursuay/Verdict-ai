@@ -146,6 +146,41 @@ function buildReportFormat(requestType: RequestType | string): string {
   }
 }
 
+function buildProjectContextSection(req: DecisionRequest): string {
+  const ctx = req.projectContext;
+  const hasContext = !!ctx && (
+    !!ctx.githubRepoUrl ||
+    !!ctx.localProjectPath ||
+    !!ctx.liveUrl ||
+    !!ctx.vercelProjectUrl ||
+    !!ctx.vpsHost ||
+    !!ctx.supabaseProjectUrl ||
+    !!ctx.notes
+  );
+
+  if (req.repoRequired && !hasContext) {
+    return `\n\n## Proje Bağlamı\n_Repo analizi istendi ancak GitHub repo URL'i veya lokal proje yolu sağlanmadı. Kod erişimi doğrulanmadan kesin kod analizi yapma._`;
+  }
+
+  if (!hasContext) return "";
+
+  const lines: string[] = [];
+  if (ctx?.githubRepoUrl) lines.push(`- GitHub Repo: ${ctx.githubRepoUrl}`);
+  if (ctx?.localProjectPath) lines.push(`- Lokal Proje Yolu: ${ctx.localProjectPath}`);
+  if (ctx?.liveUrl) lines.push(`- Canlı URL: ${ctx.liveUrl}`);
+  if (ctx?.vercelProjectUrl) lines.push(`- Vercel: ${ctx.vercelProjectUrl}`);
+  if (ctx?.vpsHost) lines.push(`- VPS / Worker: ${ctx.vpsHost}`);
+  if (ctx?.supabaseProjectUrl) lines.push(`- Supabase: ${ctx.supabaseProjectUrl}`);
+  if (ctx?.notes) lines.push(`- Notlar: ${ctx.notes}`);
+
+  // Lokal yol varsa Claude Code'a klasör doğrulama talimatı.
+  const verifyStep = ctx?.localProjectPath
+    ? `\n\nClaude Code için: Önce \`${ctx.localProjectPath}\` klasörüne geç ve \`pwd\` + \`ls\` ile doğru proje olduğunu doğrula. Sonra çalışmaya başla.`
+    : "";
+
+  return `\n\n## Proje Bağlamı\n${lines.join("\n")}${verifyStep}`;
+}
+
 function normalizePlan(executionPlan: string[]): string[] {
   if (executionPlan.length === 1 && executionPlan[0].includes("→")) {
     return executionPlan[0].split("→").map(s => s.trim()).filter(Boolean);
@@ -195,6 +230,7 @@ export function generatePromptOutput(
   const typeSection = buildTypeSection(req.requestType);
   const safetySection = isCoinBot ? buildCoinBotSafety() : "";
   const reportSection = buildReportFormat(req.requestType);
+  const projectContextSection = buildProjectContextSection(req);
 
   const body =
 `# ${req.requestType} — ${req.projectName}
@@ -204,7 +240,7 @@ export function generatePromptOutput(
 - Talep Tipi: ${req.requestType}
 - Öncelik: ${req.priority}
 - Problem: ${req.problem}
-- Beklenen Çıktı: ${req.expectedOutput}${req.repoRequired ? "\n- Repo: Erişim gerekli" : ""}
+- Beklenen Çıktı: ${req.expectedOutput}${req.repoRequired ? "\n- Repo: Erişim gerekli" : ""}${projectContextSection}
 
 ## Nihai Karar (Hakem)
 ${verdict.verdict}
