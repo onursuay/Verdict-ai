@@ -168,7 +168,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           type="text"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
-          placeholder="örn: CoinBot, YoAi, Antso, Yeni Proje"
           required
           className="w-full px-4 py-2.5 rounded-lg border border-slate-500/55 bg-[#202b40] text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition"
         />
@@ -220,10 +219,10 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         </div>
       </div>
 
-      {/* Problem / Prompt */}
+      {/* Prompt */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-1.5">
-          Problem / Prompt
+          Prompt
         </label>
         <textarea
           value={problem}
@@ -232,7 +231,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             e.target.style.height = "auto";
             e.target.style.height = e.target.scrollHeight + "px";
           }}
-          placeholder="Konuyu, hatayı, hedefi veya analiz edilmesini istediğin durumu detaylı yaz…"
           required
           style={{ minHeight: "160px" }}
           className="w-full px-4 py-2.5 rounded-lg border border-slate-500/55 bg-[#202b40] text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60 transition resize-none overflow-hidden"

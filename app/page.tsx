@@ -172,10 +172,6 @@ export default function Home() {
 
             {/* Form */}
             <div className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm p-6 sm:p-8">
-              <h2 className="text-base font-semibold text-slate-100 mb-6 flex items-center gap-2">
-                <span>📋</span>
-                Yeni Karar Talebi
-              </h2>
               <DecisionRequestForm onSubmit={handleSubmit} isLoading={isLoading} />
             </div>
           </div>
