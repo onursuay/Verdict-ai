@@ -73,9 +73,20 @@ export default function Home() {
       <div className="algorithm-layer" aria-hidden="true">
         <svg className="network-field" viewBox="0 0 1440 900" preserveAspectRatio="none">
           <g className="network-cluster network-left-top">
-            <path d="M52 64 L168 84 L258 146 L362 132 L468 212 L590 210" />
-            <path d="M168 84 L228 218 L362 132 L408 314 L590 210" />
-            <path d="M120 348 L228 218 L408 314 L316 446 L178 474 L120 348" />
+            <line x1="52" y1="64" x2="168" y2="84" />
+            <line x1="168" y1="84" x2="258" y2="146" />
+            <line x1="258" y1="146" x2="362" y2="132" />
+            <line x1="362" y1="132" x2="468" y2="212" />
+            <line x1="468" y1="212" x2="590" y2="210" />
+            <line x1="168" y1="84" x2="228" y2="218" />
+            <line x1="228" y1="218" x2="362" y2="132" />
+            <line x1="362" y1="132" x2="408" y2="314" />
+            <line x1="408" y1="314" x2="590" y2="210" />
+            <line x1="120" y1="348" x2="228" y2="218" />
+            <line x1="228" y1="218" x2="408" y2="314" />
+            <line x1="408" y1="314" x2="316" y2="446" />
+            <line x1="316" y1="446" x2="178" y2="474" />
+            <line x1="178" y1="474" x2="120" y2="348" />
             <circle cx="52" cy="64" r="4" />
             <circle cx="168" cy="84" r="5" className="node-hot" />
             <circle cx="258" cy="146" r="4" />
@@ -89,9 +100,18 @@ export default function Home() {
             <circle cx="178" cy="474" r="4" />
           </g>
           <g className="network-cluster network-left-bottom">
-            <path d="M94 616 L188 548 L292 624 L354 734 L262 812 L112 768 L94 616" />
-            <path d="M188 548 L354 734 L482 642 L568 716 L594 826" />
-            <path d="M292 624 L482 642 L514 524" />
+            <line x1="94" y1="616" x2="188" y2="548" />
+            <line x1="188" y1="548" x2="292" y2="624" />
+            <line x1="292" y1="624" x2="354" y2="734" />
+            <line x1="354" y1="734" x2="262" y2="812" />
+            <line x1="262" y1="812" x2="112" y2="768" />
+            <line x1="112" y1="768" x2="94" y2="616" />
+            <line x1="188" y1="548" x2="354" y2="734" />
+            <line x1="354" y1="734" x2="482" y2="642" />
+            <line x1="482" y1="642" x2="568" y2="716" />
+            <line x1="568" y1="716" x2="594" y2="826" />
+            <line x1="292" y1="624" x2="482" y2="642" />
+            <line x1="482" y1="642" x2="514" y2="524" />
             <circle cx="94" cy="616" r="5" />
             <circle cx="188" cy="548" r="4" />
             <circle cx="292" cy="624" r="5" />
@@ -104,9 +124,17 @@ export default function Home() {
             <circle cx="514" cy="524" r="4" />
           </g>
           <g className="network-cluster network-right-top">
-            <path d="M974 92 L1088 142 L1198 88 L1292 164 L1364 132" />
-            <path d="M1088 142 L1138 286 L1292 164 L1344 302 L1240 396 L1138 286" />
-            <path d="M974 92 L1014 246 L1138 286" />
+            <line x1="974" y1="92" x2="1088" y2="142" />
+            <line x1="1088" y1="142" x2="1198" y2="88" />
+            <line x1="1198" y1="88" x2="1292" y2="164" />
+            <line x1="1292" y1="164" x2="1364" y2="132" />
+            <line x1="1088" y1="142" x2="1138" y2="286" />
+            <line x1="1138" y1="286" x2="1292" y2="164" />
+            <line x1="1292" y1="164" x2="1344" y2="302" />
+            <line x1="1344" y1="302" x2="1240" y2="396" />
+            <line x1="1240" y1="396" x2="1138" y2="286" />
+            <line x1="974" y1="92" x2="1014" y2="246" />
+            <line x1="1014" y1="246" x2="1138" y2="286" />
             <circle cx="974" cy="92" r="4" />
             <circle cx="1088" cy="142" r="5" />
             <circle cx="1198" cy="88" r="5" />
@@ -118,9 +146,15 @@ export default function Home() {
             <circle cx="1014" cy="246" r="4" />
           </g>
           <g className="network-cluster network-right-bottom">
-            <path d="M920 620 L1014 698 L1134 642 L1268 722 L1382 664" />
-            <path d="M1014 698 L1052 826 L1198 782 L1268 722" />
-            <path d="M920 620 L1052 826 L1198 782" />
+            <line x1="920" y1="620" x2="1014" y2="698" />
+            <line x1="1014" y1="698" x2="1134" y2="642" />
+            <line x1="1134" y1="642" x2="1268" y2="722" />
+            <line x1="1268" y1="722" x2="1382" y2="664" />
+            <line x1="1014" y1="698" x2="1052" y2="826" />
+            <line x1="1052" y1="826" x2="1198" y2="782" />
+            <line x1="1198" y1="782" x2="1268" y2="722" />
+            <line x1="920" y1="620" x2="1052" y2="826" />
+            <line x1="1052" y1="826" x2="1198" y2="782" />
             <circle cx="920" cy="620" r="5" />
             <circle cx="1014" cy="698" r="4" className="node-hot" />
             <circle cx="1134" cy="642" r="5" />
