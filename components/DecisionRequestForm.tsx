@@ -123,13 +123,6 @@ function ActionButton({ children, onClick, variant = "secondary", disabled = fal
   );
 }
 
-function StatusDot({ connected }: { connected: boolean }) {
-  return (
-    <span className={`inline-block h-2 w-2 flex-shrink-0 rounded-full ${
-      connected ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" : "bg-red-400/70"
-    }`} />
-  );
-}
 
 function stripGithubRepoSuffix(v: string) { return v.replace(/\.git$/i, "").replace(/\/+$/, ""); }
 function parseGithubFullName(input: string): string | undefined {
@@ -336,10 +329,10 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     repoRequired && localProjectPath ? "Lokal proje yolu Claude Code görevlerine bağlam olarak eklenir." : "",
   ].filter(Boolean);
 
-  // Card renderer — no "Bağlı değil" badge, only show badge when connected
-  const renderCard = ({ icon, title, connected, statusTone, value, actions }: {
+  // Card renderer — clean, no status dots inside cards
+  const renderCard = ({ icon, title, connected, value, actions }: {
     icon: string; title: string; connected: boolean;
-    statusTone?: BadgeTone; value?: string; actions: ReactNode;
+    value?: string; actions: ReactNode;
   }) => (
     <div className="min-w-0 rounded-lg border border-slate-500/45 bg-[#202b40]/80 p-3 shadow-sm">
       <div className="flex items-start gap-3">
@@ -347,18 +340,10 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold text-slate-100">{title}</h4>
-            {connected && statusTone && (
-              <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${BADGE_TONES[statusTone]}`}>Bağlı</span>
-            )}
-          </div>
-          <div className="mt-1.5 flex items-center gap-1.5">
-            <StatusDot connected={connected} />
-            {connected && value && (
-              <p className="truncate text-xs text-slate-400" title={value}>{value}</p>
-            )}
-          </div>
+          <h4 className="text-sm font-semibold text-slate-100">{title}</h4>
+          {connected && value && (
+            <p className="mt-1 truncate text-xs text-slate-400" title={value}>{value}</p>
+          )}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">{actions}</div>
@@ -492,6 +477,16 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         <span className="text-sm text-slate-300 flex items-center gap-2 flex-wrap">
           Kod deposu analizi gerekli
           <span className="text-slate-500 text-xs font-normal">AI karar verirken GitHub repo/kod bağlamı gerekiyorsa açın.</span>
+          {repoRequired && (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${
+              hasAnyContext
+                ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
+                : "border-red-300/30 bg-red-400/10 text-red-200"
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${hasAnyContext ? "bg-emerald-400" : "bg-red-400"}`} />
+              {hasAnyContext ? "Bağlantı var" : "Bağlantı yok"}
+            </span>
+          )}
         </span>
       </div>
 
@@ -519,7 +514,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderCard({
               icon: "GH", title: "GitHub",
               connected: !!oauthConnections.github,
-              statusTone: "success",
               value: oauthConnections.github
                 ? `${oauthConnections.github.label}${githubRepoFullName ? ` · ${githubRepoFullName}` : " · Repo seçilmedi"}`
                 : undefined,
@@ -541,7 +535,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderCard({
               icon: "URL", title: "Canlı Site",
               connected: !!liveUrl,
-              statusTone: liveUrlStatus === "valid" ? "success" : liveUrlStatus === "invalid" ? "danger" : "info",
               value: liveUrl,
               actions: !liveUrl
                 ? <ActionButton variant="primary" onClick={() => openWizard("liveUrl")}>Bağlan</ActionButton>
@@ -556,7 +549,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderCard({
               icon: "VC", title: "Vercel",
               connected: !!oauthConnections.vercel,
-              statusTone: "info",
               value: oauthConnections.vercel
                 ? `${oauthConnections.vercel.label}${vercelUrl ? ` · ${vercelUrl.replace("https://vercel.com/", "")}` : " · Proje seçilmedi"}`
                 : undefined,
@@ -578,7 +570,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderCard({
               icon: "VPS", title: "VPS / Worker",
               connected: !!vpsHost,
-              statusTone: "success",
               value: vpsHost,
               actions: !vpsHost
                 ? <ActionButton variant="primary" onClick={() => openWizard("vpsHost")}>Bağlan</ActionButton>
@@ -593,7 +584,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderCard({
               icon: "LP", title: "Lokal Proje",
               connected: !!localProjectPath,
-              statusTone: "success",
               value: localProjectPath,
               actions: !localProjectPath
                 ? <ActionButton variant="primary" onClick={() => openWizard("localProjectPath")}>Bağlan</ActionButton>
@@ -608,7 +598,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderCard({
               icon: "SB", title: "Supabase",
               connected: !!oauthConnections.supabase,
-              statusTone: "info",
               value: oauthConnections.supabase
                 ? `${oauthConnections.supabase.label}${supabaseUrl ? ` · ${supabaseUrl.split("/project/")[1] ?? ""}` : " · Proje seçilmedi"}`
                 : undefined,
