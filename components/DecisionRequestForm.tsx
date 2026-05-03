@@ -74,17 +74,6 @@ function sanitizeProjectContextDraft(input: unknown): ProjectContext {
     }
   });
 
-  // Migration: stale "verdict_ai" yolunu doğru "ai-karar-masasi" yoluna düzelt.
-  // Bu repo'nun gerçek yeri /Users/onursuay/Desktop/Onur Suay/Web Siteleri/ai-karar-masasi
-  // verdict_ai klasörü boş/yanlış; eski oturumlardan localStorage'a yazılmış olabilir.
-  if (context.localProjectPath) {
-    if (/[\\/]verdict_ai[\\/]?$/.test(context.localProjectPath)) {
-      context.localProjectPath = context.localProjectPath.replace(/([\\/])verdict_ai([\\/]?)$/, "$1ai-karar-masasi$2");
-    } else if (context.localProjectPath.endsWith("verdict_ai")) {
-      context.localProjectPath = context.localProjectPath.slice(0, -"verdict_ai".length) + "ai-karar-masasi";
-    }
-  }
-
   if (!context.githubRepoUrl) {
     delete context.githubRepoFullName;
     delete context.githubConnectionStatus;
