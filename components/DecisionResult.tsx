@@ -644,12 +644,20 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
           {/* Bağlantı Kullanımı — debug özeti */}
           {result.connectionUsageSummary && (() => {
             const s = result.connectionUsageSummary;
+            const githubContextValue = s.githubContextFetched
+              ? `Okundu (${s.githubContextFileCount} dosya)`
+              : s.githubContextError
+                ? s.githubContextError
+                : s.repoRequired && !s.hasGithubRepoUrl
+                  ? "Repo URL eksik — çekilmedi"
+                  : "Çekilmedi";
             const rows: Array<[string, string, "ok" | "warn" | "off"]> = [
               ["Kod analizi toggle", s.repoRequired ? "Açık" : "Kapalı", s.repoRequired ? "ok" : "off"],
               ["GitHub repo URL", s.hasGithubRepoUrl ? "Var" : "Yok", s.hasGithubRepoUrl ? "ok" : s.repoRequired ? "warn" : "off"],
-              ["GitHub kod bağlamı", s.githubContextFetched ? `Okundu (${s.githubContextFileCount} dosya)` : (s.githubContextError ? `Hata: ${s.githubContextError}` : "Çekilmedi"), s.githubContextFetched ? "ok" : s.repoRequired && s.hasGithubRepoUrl ? "warn" : "off"],
+              ["GitHub full name", s.githubRepoFullName || "Yok", s.githubRepoFullName ? "ok" : s.repoRequired && s.hasGithubRepoUrl ? "warn" : "off"],
+              ["GitHub kod bağlamı", githubContextValue, s.githubContextFetched ? "ok" : s.repoRequired ? "warn" : "off"],
               ["Gemini API key", s.hasGeminiKey ? "Var" : "Yok", s.hasGeminiKey ? "ok" : "warn"],
-              ["Gemini durumu", s.geminiSource === "live" ? "Canlı" : (s.geminiError ? `Mock (${s.geminiError})` : "Mock"), s.geminiSource === "live" ? "ok" : "warn"],
+              ["Gemini durumu", s.geminiSource === "live" ? "Canlı" : (s.geminiError ? `Mock — ${s.geminiError}` : "Mock"), s.geminiSource === "live" ? "ok" : "warn"],
               ["Supabase bağlamı", s.hasSupabaseContext ? "Var" : "Yok", s.hasSupabaseContext ? "ok" : "off"],
               ["Lokal yol", s.hasLocalPath ? "Var" : "Yok", s.hasLocalPath ? "ok" : "off"],
               ["Canlı URL", s.hasLiveUrl ? "Var" : "Yok", s.hasLiveUrl ? "ok" : "off"],

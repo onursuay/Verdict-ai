@@ -145,6 +145,7 @@ export interface RepoContextSource {
 export interface ConnectionUsageSummary {
   repoRequired: boolean;
   hasGithubRepoUrl: boolean;
+  githubRepoFullName?: string;
   githubContextFetched: boolean;
   githubContextFileCount: number;
   githubContextError?: string;

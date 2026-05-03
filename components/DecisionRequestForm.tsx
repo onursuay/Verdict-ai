@@ -130,16 +130,16 @@ type OAuthConnections = {
   supabase?: OAuthConnection;
 };
 
-// Keys that go directly to input step (no OAuth step 1)
-const DIRECT_INPUT_KEYS: ConnectionKey[] = ["liveUrl", "vercelProjectUrl", "vpsHost", "localProjectPath", "supabaseProjectUrl"];
+type EditableContextKey = ConnectionKey | "notes";
 
 type WizardConfig = {
   title: string;
   inputLabel: string;
   inputPlaceholder: string;
   inputType?: "text" | "url";
+  multiline?: boolean;
 };
-const WIZARD_CONFIGS: Record<ConnectionKey, WizardConfig> = {
+const WIZARD_CONFIGS: Record<EditableContextKey, WizardConfig> = {
   githubRepoUrl: {
     title: "GitHub Repo Seç",
     inputLabel: "Repo URL",
@@ -167,7 +167,7 @@ const WIZARD_CONFIGS: Record<ConnectionKey, WizardConfig> = {
   localProjectPath: {
     title: "Lokal Proje Yolu",
     inputLabel: "Yol",
-    inputPlaceholder: "/Users/onursuay/Desktop/Onur Suay/Web Siteleri/coinbot",
+    inputPlaceholder: "/Users/onursuay/Desktop/Onur Suay/Web Siteleri/verdict_ai",
     inputType: "text",
   },
   supabaseProjectUrl: {
@@ -176,9 +176,16 @@ const WIZARD_CONFIGS: Record<ConnectionKey, WizardConfig> = {
     inputPlaceholder: "https://supabase.com/dashboard/project/...",
     inputType: "url",
   },
+  notes: {
+    title: "Ek Not",
+    inputLabel: "Not",
+    inputPlaceholder: "Branch adı, deployment ortamı veya kritik bağlam...",
+    inputType: "text",
+    multiline: true,
+  },
 };
 
-type WizardState = { keyName: ConnectionKey; inputValue: string };
+type WizardState = { keyName: EditableContextKey; inputValue: string };
 type PromptModalConfig = { title: string; body: string; source: "vps" | "local" };
 type SupabaseProjectItem = { ref: string; name: string; region: string; organization_id: string; created_at: string };
 type SupabaseProjectModalState = { loading: boolean; error: string | null; projects: SupabaseProjectItem[] };
@@ -199,14 +206,53 @@ const ACTION_VARIANTS: Record<ActionVariant, string> = {
   ghost: "border-cyan-300/30 bg-cyan-400/10 text-cyan-100 hover:border-cyan-300/55 hover:bg-cyan-400/15",
 };
 
-function ActionButton({ children, onClick, variant = "secondary", disabled = false }: {
-  children: ReactNode; onClick: () => void; variant?: ActionVariant; disabled?: boolean;
-}) {
+function ConnectButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled}
-      className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 ${ACTION_VARIANTS[variant]}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition cursor-pointer ${ACTION_VARIANTS.secondary}`}
+    >
       {children}
     </button>
+  );
+}
+
+function ConnectedChip({
+  code,
+  label,
+  onEdit,
+  onDisconnect,
+  disconnectLabel = "Kes",
+}: {
+  code: string;
+  label: string;
+  onEdit?: () => void;
+  onDisconnect: () => void;
+  disconnectLabel?: "Kes" | "Sil";
+}) {
+  return (
+    <div className="inline-flex h-9 max-w-full items-center overflow-hidden rounded-lg border border-emerald-300/35 bg-emerald-400/10 text-emerald-100">
+      <button
+        type="button"
+        onClick={onEdit}
+        disabled={!onEdit}
+        title={label}
+        className="flex min-w-0 items-center gap-2 px-2.5 text-xs font-semibold disabled:cursor-default"
+      >
+        <span className="flex h-5 min-w-7 items-center justify-center rounded border border-emerald-300/30 bg-slate-950/25 px-1 text-[10px] font-black tracking-wide">
+          {code}
+        </span>
+        <span className="truncate">{label}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onDisconnect}
+        className="h-full border-l border-emerald-300/25 px-2 text-[11px] font-semibold text-emerald-200 transition hover:bg-red-400/15 hover:text-red-100"
+      >
+        {disconnectLabel}
+      </button>
+    </div>
   );
 }
 
@@ -229,6 +275,23 @@ function parseGithubFullName(input: string): string | undefined {
 function isHttpUrl(input: string): boolean {
   try { const u = new URL(input.trim()); return ["http:", "https:"].includes(u.protocol) && !!u.hostname; }
   catch { return false; }
+}
+function hostLabel(input: string): string {
+  try { return new URL(input.trim()).hostname.replace(/^www\./, ""); }
+  catch { return input.trim(); }
+}
+function pathLabel(input: string): string {
+  const clean = input.trim().replace(/\/+$/, "");
+  return clean.split("/").filter(Boolean).pop() || clean;
+}
+function vercelLabel(input: string): string {
+  try {
+    const url = new URL(input.trim());
+    const parts = url.pathname.split("/").filter(Boolean);
+    return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : hostLabel(input);
+  } catch {
+    return input.trim();
+  }
 }
 
 export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionRequestFormProps) {
@@ -385,7 +448,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     ]);
   };
 
-  const applyContextValue = (key: ConnectionKey, rawValue: string) => {
+  const applyContextValue = (key: EditableContextKey, rawValue: string) => {
     const value = rawValue.trim();
     setProjectContext((prev) => {
       const next: ProjectContext = { ...prev, projectConnectionsUpdatedAt: new Date().toISOString() };
@@ -459,12 +522,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     return Object.keys(trimmed).length ? trimmed : undefined;
   };
 
-  const hasAnyContext = CONNECTION_KEYS.some((k) => !!projectContext[k]?.trim())
-    || !!projectContext.notes?.trim()
-    || !!projectContext.supabaseProjectRef?.trim()
-    || !!oauthConnections.github || !!oauthConnections.vercel || !!oauthConnections.supabase;
-
-  const openWizard = (keyName: ConnectionKey) =>
+  const openWizard = (keyName: EditableContextKey) =>
     setWizard({ keyName, inputValue: projectContext[keyName] ?? "" });
 
   const openSupabaseProjectModal = async () => {
@@ -570,30 +628,43 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const localProjectPath = projectContext.localProjectPath?.trim() ?? "";
   const supabaseUrl = projectContext.supabaseProjectUrl?.trim() ?? "";
   const notes = projectContext.notes?.trim() ?? "";
+  const supabaseProjectRef = projectContext.supabaseProjectRef?.trim() ?? "";
+  const supabaseProjectName = projectContext.supabaseProjectName?.trim() ?? "";
+  // hasGithubUrl: repo URL gerçekten girilmiş → backend'e gidecek
+  // hasGithubConnection: chip/display için (URL veya parsed fullName)
+  // hasGithubOAuthOnly: OAuth bağlandı ama repo URL henüz girilmedi → uyarı durumu
+  const hasGithubUrl = !!githubRepoUrl;
+  const hasGithubConnection = hasGithubUrl || !!githubRepoFullName;
+  const hasGithubOAuthOnly = !hasGithubConnection && !!oauthConnections.github;
+  const hasVercelConnection = !!vercelUrl || !!oauthConnections.vercel;
+  const hasSupabaseConnection = !!supabaseUrl || !!supabaseProjectRef || !!supabaseProjectName || !!oauthConnections.supabase;
+  // connectedSourceCount: yalnızca URL/değer girilmiş kaynaklar sayılır.
+  // OAuth-only (repo URL girmeden) kaynak sayımına girmez.
   const connectedSourceCount = [
-    !!githubRepoUrl,
+    hasGithubUrl,
     !!liveUrl,
-    !!vercelUrl,
+    hasVercelConnection,
     !!vpsHost,
     !!localProjectPath,
-    !!supabaseUrl || !!projectContext.supabaseProjectRef?.trim(),
+    hasSupabaseConnection,
+    !!notes,
   ].filter(Boolean).length;
   const hasAnyConnection = connectedSourceCount > 0;
   const sourceCountLabel = hasAnyConnection ? `Bağlı kaynak: ${connectedSourceCount}` : "Bağlı kaynak yok";
   const analysisStateMessage = repoRequired
-    ? hasAnyConnection
-      ? "Kod analizi açık. Bağlı kaynaklar analizde kullanılacak."
-      : "Kod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder."
+    ? hasGithubOAuthOnly && !hasAnyConnection
+      ? "GitHub hesabı bağlı ancak repo URL girilmedi — analiz sırasında kod bağlamı kullanılamaz."
+      : hasAnyConnection
+        ? "Kod analizi açık. Bağlı kaynaklar analizde kullanılacak."
+        : "Kod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder."
     : hasAnyConnection
       ? "Bağlantılar kayıtlı ancak bu analizde kullanılmayacak."
       : "Kod deposu analizi kapalı. Bağlantılar saklanır ancak bu analizde kullanılmaz.";
 
-  const repoNoticeItems = [
-    repoRequired && !hasAnyConnection ? "Kod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder." : "",
-    repoRequired && hasAnyConnection ? "Kod analizi açık. Bağlı kaynaklar analizde kullanılacak." : "",
-    repoRequired && githubRepoUrl ? "GitHub bağlı. Kod dosyaları analiz sırasında okunur." : "",
-    !repoRequired && hasAnyConnection ? "Bağlantılar kayıtlı ancak bu analizde kullanılmayacak." : "",
-  ].filter(Boolean);
+  const githubLabel = githubRepoFullName || parseGithubFullName(githubRepoUrl) || oauthConnections.github?.label || "GitHub bağlı";
+  const liveLabel = liveUrl ? hostLabel(liveUrl) : "";
+  const vercelSourceLabel = vercelUrl ? vercelLabel(vercelUrl) : oauthConnections.vercel?.label || "Vercel bağlı";
+  const supabaseLabel = supabaseProjectName || supabaseProjectRef || (supabaseUrl ? pathLabel(supabaseUrl) : "") || oauthConnections.supabase?.label || "Supabase bağlı";
 
   // Wizard live preview
   const renderWizardPreview = () => {
@@ -714,287 +785,139 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       </div>
 
       {/* Repo Toggle */}
-      <div className="flex items-center gap-3 p-4 bg-slate-700/45 rounded-lg border border-slate-500/45">
-        <button type="button" onClick={() => setRepoRequired(!repoRequired)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${repoRequired ? "bg-emerald-400" : "bg-slate-600"}`}>
-          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${repoRequired ? "translate-x-6" : "translate-x-1"}`} />
-        </button>
-        <span className="text-sm text-slate-300 flex items-center gap-2 flex-wrap">
-          Kod deposu analizi gerekli
-          <span className="text-slate-500 text-xs font-normal">AI karar verirken GitHub repo/kod bağlamı gerekiyorsa açın.</span>
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${
+      <div className="rounded-lg border border-slate-500/45 bg-slate-700/45 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <button
+              type="button"
+              aria-pressed={repoRequired}
+              onClick={() => setRepoRequired(!repoRequired)}
+              className={`mt-0.5 inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${repoRequired ? "bg-emerald-400" : "bg-slate-600"}`}
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${repoRequired ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-200">Kod deposu analizi gerekli</p>
+              <p className={`mt-0.5 text-xs ${repoRequired ? "text-emerald-200" : "text-slate-400"}`}>
+                {analysisStateMessage}
+              </p>
+            </div>
+          </div>
+          <span className={`w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${
             hasAnyConnection
               ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
-              : "border-slate-500/45 bg-slate-700/45 text-slate-300"
+              : "border-slate-500/45 bg-slate-800/55 text-slate-300"
           }`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${hasAnyConnection ? "bg-emerald-400" : "bg-slate-500"}`} />
             {sourceCountLabel}
           </span>
-          <span className={repoRequired ? "text-emerald-200 text-xs font-normal" : "text-amber-200 text-xs font-normal"}>
-            {analysisStateMessage}
-          </span>
-        </span>
+        </div>
       </div>
 
       {/* Proje Bağlantıları */}
-      {repoRequired ? (
+      {repoRequired && (
         <div className="rounded-lg border border-slate-500/45 bg-slate-700/30 p-4">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-slate-100">Proje Bağlantıları</h3>
-            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
               hasAnyConnection
-                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
+                ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
                 : "border-slate-500/45 bg-slate-800/55 text-slate-300"
             }`}>
               {sourceCountLabel}
             </span>
           </div>
-          {repoNoticeItems.length > 0 && (
-            <div className="mb-3 space-y-2">
-              {repoNoticeItems.map((notice) => (
-                <div key={notice} className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
-                  {notice}
+
+          {hasAnyConnection && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {hasGithubConnection && (
+                <ConnectedChip
+                  code="GH"
+                  label={githubLabel}
+                  onEdit={() => openWizard("githubRepoUrl")}
+                  onDisconnect={() => oauthConnections.github ? disconnect("github") : clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}
+                />
+              )}
+              {hasGithubOAuthOnly && (
+                <div className="inline-flex h-9 max-w-full items-center overflow-hidden rounded-lg border border-amber-300/40 bg-amber-400/10 text-amber-100">
+                  <button
+                    type="button"
+                    onClick={() => openWizard("githubRepoUrl")}
+                    title="Repo URL girin"
+                    className="flex min-w-0 items-center gap-2 px-2.5 text-xs font-semibold"
+                  >
+                    <span className="flex h-5 min-w-7 items-center justify-center rounded border border-amber-300/40 bg-slate-950/25 px-1 text-[10px] font-black tracking-wide">GH</span>
+                    <span className="truncate">{oauthConnections.github?.label || "GitHub"} · Repo URL gerekiyor</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => disconnect("github")}
+                    className="h-full border-l border-amber-300/25 px-2 text-[11px] font-semibold text-amber-200 transition hover:bg-red-400/15 hover:text-red-100"
+                  >Kes</button>
                 </div>
-              ))}
+              )}
+              {liveUrl && (
+                <ConnectedChip
+                  code="URL"
+                  label={liveLabel}
+                  onEdit={() => openWizard("liveUrl")}
+                  onDisconnect={() => clearContextKeys(["liveUrl", "liveUrlStatus"])}
+                />
+              )}
+              {hasVercelConnection && (
+                <ConnectedChip
+                  code="VC"
+                  label={vercelSourceLabel}
+                  onEdit={() => openWizard("vercelProjectUrl")}
+                  onDisconnect={() => oauthConnections.vercel ? disconnect("vercel") : clearContextKeys(["vercelProjectUrl"])}
+                />
+              )}
+              {vpsHost && (
+                <ConnectedChip
+                  code="VPS"
+                  label={vpsHost}
+                  onEdit={() => openWizard("vpsHost")}
+                  onDisconnect={() => clearContextKeys(["vpsHost"])}
+                />
+              )}
+              {localProjectPath && (
+                <ConnectedChip
+                  code="LP"
+                  label={pathLabel(localProjectPath)}
+                  onEdit={() => openWizard("localProjectPath")}
+                  onDisconnect={() => clearContextKeys(["localProjectPath"])}
+                />
+              )}
+              {hasSupabaseConnection && (
+                <ConnectedChip
+                  code="SB"
+                  label={supabaseLabel}
+                  onEdit={oauthConnections.supabase ? openSupabaseProjectModal : () => openWizard("supabaseProjectUrl")}
+                  onDisconnect={() => oauthConnections.supabase ? disconnect("supabase") : clearContextKeys(["supabaseProjectUrl", "supabaseProjectRef", "supabaseProjectName", "supabaseOrganizationId", "supabaseConnectionStatus"])}
+                />
+              )}
+              {notes && (
+                <ConnectedChip
+                  code="NOT"
+                  label="Ek not"
+                  onEdit={() => openWizard("notes")}
+                  onDisconnect={() => clearContextKeys(["notes"])}
+                  disconnectLabel="Sil"
+                />
+              )}
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
-
-            {/* GitHub — OAuth */}
-            {!oauthConnections.github && !githubRepoUrl ? (
-              <button type="button" onClick={() => { window.location.href = "/api/auth/github"; }}
-                className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-                GitHub ile Bağlan
-              </button>
-            ) : (
-              <button type="button" onClick={() => oauthConnections.github ? disconnect("github") : clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}
-                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-                <span className="truncate max-w-[180px]">{githubRepoFullName || oauthConnections.github?.label || githubRepoUrl}</span>
-              </button>
-            )}
-
-            {/* Vercel — OAuth */}
-            {!oauthConnections.vercel && !vercelUrl ? (
-              <button type="button" onClick={() => { window.location.href = "/api/auth/vercel"; }}
-                className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
-                <svg viewBox="0 0 116 100" className="h-3.5 w-3.5 flex-shrink-0 fill-current">
-                  <path d="M57.5 0L115 100H0L57.5 0z"/>
-                </svg>
-                Vercel ile Bağlan
-              </button>
-            ) : (
-              <button type="button" onClick={() => oauthConnections.vercel ? disconnect("vercel") : clearContextKeys(["vercelProjectUrl"])}
-                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer">
-                <svg viewBox="0 0 116 100" className="h-3.5 w-3.5 flex-shrink-0 fill-current">
-                  <path d="M57.5 0L115 100H0L57.5 0z"/>
-                </svg>
-                <span className="truncate max-w-[180px]">{oauthConnections.vercel?.label || vercelUrl}</span>
-              </button>
-            )}
-
-            {/* Supabase — OAuth */}
-            {!oauthConnections.supabase && !supabaseUrl && !projectContext.supabaseProjectRef?.trim() ? (
-              <button type="button" onClick={() => { window.location.href = "/api/auth/supabase"; }}
-                className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
-                  <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.686 14.1 1.762 14.1h9.34c.487 0 .882.394.882.88l.016 8.044c.015.985 1.26 1.409 1.873.636l9.262-11.653c.663-.837.078-2.05-.998-2.05h-9.34a.881.881 0 0 1-.882-.88L11.9 1.036z"/>
-                </svg>
-                Supabase ile Bağlan
-              </button>
-            ) : oauthConnections.supabase ? (
-              <div className="flex items-center gap-1.5">
-                <button type="button" onClick={openSupabaseProjectModal}
-                  className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-400/15 cursor-pointer max-w-[260px]">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
-                    <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.686 14.1 1.762 14.1h9.34c.487 0 .882.394.882.88l.016 8.044c.015.985 1.26 1.409 1.873.636l9.262-11.653c.663-.837.078-2.05-.998-2.05h-9.34a.881.881 0 0 1-.882-.88L11.9 1.036z"/>
-                  </svg>
-                  <span className="truncate">
-                    {projectContext.supabaseProjectName ? projectContext.supabaseProjectName : (oauthConnections.supabase.label || "Bağlı") + " · Proje Seç"}
-                  </span>
-                </button>
-                <button type="button" onClick={() => disconnect("supabase")}
-                  title="Bağlantıyı Kes"
-                  className="flex items-center justify-center h-9 w-9 rounded-lg border border-red-300/30 bg-red-400/10 text-red-200 transition hover:border-red-300/55 hover:bg-red-400/20 cursor-pointer">
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="6" y1="6" x2="18" y2="18" /><line x1="6" y1="18" x2="18" y2="6" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <button type="button" onClick={() => clearContextKeys(["supabaseProjectUrl", "supabaseProjectRef", "supabaseProjectName", "supabaseOrganizationId", "supabaseConnectionStatus"])}
-                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer max-w-[220px]">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
-                  <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.686 14.1 1.762 14.1h9.34c.487 0 .882.394.882.88l.016 8.044c.015.985 1.26 1.409 1.873.636l9.262-11.653c.663-.837.078-2.05-.998-2.05h-9.34a.881.881 0 0 1-.882-.88L11.9 1.036z"/>
-                </svg>
-                <span className="truncate">{projectContext.supabaseProjectName || projectContext.supabaseProjectRef || supabaseUrl}</span>
-              </button>
-            )}
-
-            {/* Canlı Site — manual */}
-            {!liveUrl ? (
-              <button type="button" onClick={() => openWizard("liveUrl")}
-                className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
-                Canlı Site ile Bağlan
-              </button>
-            ) : (
-              <button type="button" onClick={() => clearContextKeys(["liveUrl", "liveUrlStatus"])}
-                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer max-w-[200px]">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
-                <span className="truncate">{liveUrl}</span>
-              </button>
-            )}
-
-            {/* VPS / Worker — manual */}
-            {!vpsHost ? (
-              <button type="button" onClick={() => openWizard("vpsHost")}
-                className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                  <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-                </svg>
-                VPS / Worker ile Bağlan
-              </button>
-            ) : (
-              <button type="button" onClick={() => clearContextKeys(["vpsHost"])}
-                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer max-w-[200px]">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                  <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-                </svg>
-                <span className="truncate">{vpsHost}</span>
-              </button>
-            )}
-
-            {/* Lokal Proje — manual */}
-            {!localProjectPath ? (
-              <button type="button" onClick={() => openWizard("localProjectPath")}
-                className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-                Lokal Proje ile Bağlan
-              </button>
-            ) : (
-              <button type="button" onClick={() => clearContextKeys(["localProjectPath"])}
-                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer max-w-[200px]">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-                <span className="truncate">{localProjectPath}</span>
-              </button>
-            )}
-
+            {!hasGithubConnection && !hasGithubOAuthOnly && <ConnectButton onClick={() => { window.location.href = "/api/auth/github"; }}>GitHub Bağla</ConnectButton>}
+            {!liveUrl && <ConnectButton onClick={() => openWizard("liveUrl")}>Canlı Site Bağla</ConnectButton>}
+            {!hasVercelConnection && <ConnectButton onClick={() => { window.location.href = "/api/auth/vercel"; }}>Vercel Bağla</ConnectButton>}
+            {!vpsHost && <ConnectButton onClick={() => openWizard("vpsHost")}>VPS Bağla</ConnectButton>}
+            {!localProjectPath && <ConnectButton onClick={() => openWizard("localProjectPath")}>Lokal Proje Bağla</ConnectButton>}
+            {!hasSupabaseConnection && <ConnectButton onClick={() => { window.location.href = "/api/auth/supabase"; }}>Supabase Bağla</ConnectButton>}
+            {!notes && <ConnectButton onClick={() => openWizard("notes")}>Not Ekle</ConnectButton>}
           </div>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-slate-500/35 bg-slate-800/35 p-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-sm font-semibold text-slate-200">Proje Bağlantıları</h3>
-            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
-              hasAnyConnection
-                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
-                : "border-slate-500/45 bg-slate-900/35 text-slate-300"
-            }`}>
-              {sourceCountLabel}
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-amber-200">
-            Kod deposu analizi kapalı. Bağlantılar saklanır ancak bu analizde kullanılmaz.
-          </p>
         </div>
       )}
-
-      <details className="rounded-lg border border-slate-500/25 bg-slate-950/10 p-3">
-        <summary className="cursor-pointer select-none text-xs font-semibold text-slate-400">
-          Gelişmiş manuel düzenleme
-        </summary>
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">GitHub Repo URL</label>
-            <input
-              type="url"
-              value={projectContext.githubRepoUrl ?? ""}
-              onChange={(e) => updateContext("githubRepoUrl", e.target.value)}
-              placeholder="https://github.com/onursuay/coinbot"
-              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Canlı Site URL</label>
-            <input
-              type="url"
-              value={projectContext.liveUrl ?? ""}
-              onChange={(e) => updateContext("liveUrl", e.target.value)}
-              placeholder="https://coin.onursuay.com"
-              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Vercel Project URL</label>
-            <input
-              type="url"
-              value={projectContext.vercelProjectUrl ?? ""}
-              onChange={(e) => updateContext("vercelProjectUrl", e.target.value)}
-              placeholder="https://vercel.com/onur-suay/coinbot"
-              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">VPS / Worker Bilgisi</label>
-            <input
-              type="text"
-              value={projectContext.vpsHost ?? ""}
-              onChange={(e) => updateContext("vpsHost", e.target.value)}
-              placeholder="Hostinger VPS, Docker worker, /opt/coinbot"
-              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Lokal Proje Yolu</label>
-            <input
-              type="text"
-              value={projectContext.localProjectPath ?? ""}
-              onChange={(e) => updateContext("localProjectPath", e.target.value)}
-              placeholder="/Users/onursuay/Desktop/Onur Suay/Web Siteleri/coinbot"
-              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Supabase Project URL</label>
-            <input
-              type="url"
-              value={projectContext.supabaseProjectUrl ?? ""}
-              onChange={(e) => updateContext("supabaseProjectUrl", e.target.value)}
-              placeholder="https://supabase.com/dashboard/project/..."
-              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Ek Not</label>
-            <textarea
-              value={projectContext.notes ?? ""}
-              onChange={(e) => updateContext("notes", e.target.value)}
-              placeholder="Branch adı, deployment ortamı, kritik kısıtlar veya AI'a iletilmesi gereken diğer bağlam bilgisi..."
-              rows={2}
-              className="w-full resize-none rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-            />
-          </div>
-        </div>
-      </details>
 
       {/* Submit */}
       <button type="submit" disabled={isLoading || !projectName.trim() || !problem.trim()}
@@ -1023,11 +946,22 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             </div>
             <div className="px-5 pb-5">
               <label className="block text-xs font-medium text-slate-400 mb-1.5">{config.inputLabel}</label>
-              <input autoFocus type={config.inputType ?? "text"} value={wizard.inputValue}
-                onChange={(e) => setWizard((prev) => prev ? { ...prev, inputValue: e.target.value } : prev)}
-                onKeyDown={(e) => { if (e.key === "Enter" && canSave) wizardSave(); }}
-                placeholder={config.inputPlaceholder}
-                className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20" />
+              {config.multiline ? (
+                <textarea
+                  autoFocus
+                  value={wizard.inputValue}
+                  onChange={(e) => setWizard((prev) => prev ? { ...prev, inputValue: e.target.value } : prev)}
+                  placeholder={config.inputPlaceholder}
+                  rows={4}
+                  className="w-full resize-none rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+                />
+              ) : (
+                <input autoFocus type={config.inputType ?? "text"} value={wizard.inputValue}
+                  onChange={(e) => setWizard((prev) => prev ? { ...prev, inputValue: e.target.value } : prev)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && canSave) wizardSave(); }}
+                  placeholder={config.inputPlaceholder}
+                  className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20" />
+              )}
               {renderWizardPreview()}
               <div className="mt-5 flex justify-end gap-2">
                 <button type="button" onClick={() => setWizard(null)}

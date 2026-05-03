@@ -696,6 +696,7 @@ export async function POST(req: NextRequest) {
   const connectionUsageSummary: ConnectionUsageSummary = {
     repoRequired: !!enrichedRequest.repoRequired,
     hasGithubRepoUrl: !!ctx?.githubRepoUrl?.trim(),
+    ...(ctx?.githubRepoFullName?.trim() ? { githubRepoFullName: ctx.githubRepoFullName.trim() } : {}),
     githubContextFetched: !!repoContext && !repoContext.errorMessage && repoContext.selectedFiles.length > 0,
     githubContextFileCount: repoContext?.selectedFiles.length ?? 0,
     ...(repoContext?.errorMessage ? { githubContextError: repoContext.errorMessage } : {}),
