@@ -60,7 +60,7 @@ function buildProjectContextBlock(req: DecisionRequest): string {
 
   // Repo analizi istendi ama bağlam verilmedi → AI'a açıkça uyarı.
   if (req.repoRequired && !hasContext) {
-    return `\n\nPROJE BAĞLAMI:\nKod analizi istendi ancak proje bağlantısı eklenmedi. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder.`;
+    return `\n\nPROJE BAĞLAMI:\nKod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder.`;
   }
 
   if (!hasContext) return "";
