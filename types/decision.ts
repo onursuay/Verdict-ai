@@ -142,6 +142,22 @@ export interface RepoContextSource {
   errorMessage?: string;
 }
 
+export interface ConnectionUsageSummary {
+  repoRequired: boolean;
+  hasGithubRepoUrl: boolean;
+  githubContextFetched: boolean;
+  githubContextFileCount: number;
+  githubContextError?: string;
+  hasGeminiKey: boolean;
+  geminiSource: AnalysisSource;
+  geminiError?: string;
+  hasSupabaseContext: boolean;
+  hasLocalPath: boolean;
+  hasLiveUrl: boolean;
+  hasVercelUrl: boolean;
+  hasVpsHost: boolean;
+}
+
 export interface DecisionResult {
   requestId: string;
   analyses: AIAnalysis[];
@@ -152,9 +168,11 @@ export interface DecisionResult {
   codexSource?: AnalysisSource;
   judgeSource?: AnalysisSource;
   geminiSource?: AnalysisSource;
+  geminiError?: string;
   saved?: boolean;
   recordId?: string;
   enrichedAttachments?: DecisionAttachment[];
   followUps?: DecisionFollowUp[];
   repoContext?: RepoContextSource;
+  connectionUsageSummary?: ConnectionUsageSummary;
 }

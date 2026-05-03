@@ -38,6 +38,102 @@ const CONNECTION_KEYS: ConnectionKey[] = [
   "vercelProjectUrl", "vpsHost", "supabaseProjectUrl",
 ];
 
+const PROJECT_CONTEXT_DRAFT_KEY = "verdictai:project-context:v1";
+const PROJECT_CONTEXT_DRAFT_FIELDS: Array<keyof ProjectContext> = [
+  "githubRepoUrl",
+  "githubRepoFullName",
+  "githubConnectionStatus",
+  "liveUrl",
+  "liveUrlStatus",
+  "vercelProjectUrl",
+  "vpsHost",
+  "localProjectPath",
+  "supabaseProjectUrl",
+  "supabaseConnectionStatus",
+  "supabaseProjectRef",
+  "supabaseProjectName",
+  "supabaseOrganizationId",
+  "notes",
+  "projectConnectionsUpdatedAt",
+];
+
+type ProjectContextDraft = {
+  repoRequired: boolean;
+  projectContext: ProjectContext;
+};
+
+function sanitizeProjectContextDraft(input: unknown): ProjectContext {
+  const context: ProjectContext = {};
+  if (!input || typeof input !== "object") return context;
+  const raw = input as Record<string, unknown>;
+
+  PROJECT_CONTEXT_DRAFT_FIELDS.forEach((key) => {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim()) {
+      (context as Record<keyof ProjectContext, string | undefined>)[key] = value.trim();
+    }
+  });
+
+  // Migration: stale "verdict_ai" yolunu doğru "ai-karar-masasi" yoluna düzelt.
+  // Bu repo'nun gerçek yeri /Users/onursuay/Desktop/Onur Suay/Web Siteleri/ai-karar-masasi
+  // verdict_ai klasörü boş/yanlış; eski oturumlardan localStorage'a yazılmış olabilir.
+  if (context.localProjectPath) {
+    if (/[\\/]verdict_ai[\\/]?$/.test(context.localProjectPath)) {
+      context.localProjectPath = context.localProjectPath.replace(/([\\/])verdict_ai([\\/]?)$/, "$1ai-karar-masasi$2");
+    } else if (context.localProjectPath.endsWith("verdict_ai")) {
+      context.localProjectPath = context.localProjectPath.slice(0, -"verdict_ai".length) + "ai-karar-masasi";
+    }
+  }
+
+  if (!context.githubRepoUrl) {
+    delete context.githubRepoFullName;
+    delete context.githubConnectionStatus;
+  }
+  if (!context.liveUrl) {
+    delete context.liveUrlStatus;
+  }
+  if (!context.supabaseProjectUrl && !context.supabaseProjectRef) {
+    delete context.supabaseConnectionStatus;
+    delete context.supabaseProjectName;
+    delete context.supabaseOrganizationId;
+  }
+
+  return context;
+}
+
+function loadProjectContextDraft(): ProjectContextDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.localStorage.getItem(PROJECT_CONTEXT_DRAFT_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as Partial<ProjectContextDraft>;
+    return {
+      repoRequired: parsed.repoRequired === true,
+      projectContext: sanitizeProjectContextDraft(parsed.projectContext),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveProjectContextDraft(repoRequired: boolean, projectContext: ProjectContext) {
+  if (typeof window === "undefined") return;
+  const context = sanitizeProjectContextDraft(projectContext);
+  if (!repoRequired && Object.keys(context).length === 0) {
+    clearProjectContextDraft();
+    return;
+  }
+  window.localStorage.setItem(
+    PROJECT_CONTEXT_DRAFT_KEY,
+    JSON.stringify({ repoRequired, projectContext: context })
+  );
+}
+
+function clearProjectContextDraft() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(PROJECT_CONTEXT_DRAFT_KEY);
+}
+
 type OAuthConnection = { label: string; connectedAt: string };
 type OAuthConnections = {
   github?: OAuthConnection;
@@ -162,6 +258,21 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  useEffect(() => {
+    const draft = loadProjectContextDraft();
+    if (draft) {
+      setRepoRequired(draft.repoRequired);
+      setProjectContext(draft.projectContext);
+    }
+    setDraftLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    saveProjectContextDraft(repoRequired, projectContext);
+  }, [draftLoaded, repoRequired, projectContext]);
 
   // Read all OAuth callback params on mount + restore from localStorage
   useEffect(() => {
@@ -313,11 +424,34 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   };
 
   const updateContext = (key: keyof ProjectContext, value: string) =>
-    setProjectContext((prev) => ({ ...prev, [key]: value, projectConnectionsUpdatedAt: new Date().toISOString() }));
+    setProjectContext((prev) => {
+      const next: ProjectContext = { ...prev, [key]: value, projectConnectionsUpdatedAt: new Date().toISOString() };
+      if (key === "githubRepoUrl") {
+        const fullName = parseGithubFullName(value);
+        next.githubConnectionStatus = value.trim() ? "manual" : "not_connected";
+        if (fullName) {
+          next.githubRepoFullName = fullName;
+        } else {
+          delete next.githubRepoFullName;
+        }
+      }
+      if (key === "liveUrl") {
+        next.liveUrlStatus = value.trim() ? "not_checked" : "invalid";
+      }
+      return next;
+    });
 
   const sanitizedContext = (): ProjectContext | undefined => {
     const trimmed: ProjectContext = {};
     CONNECTION_KEYS.forEach((key) => { const v = projectContext[key]?.trim(); if (v) trimmed[key] = v; });
+    const notes = projectContext.notes?.trim();
+    if (notes) trimmed.notes = notes;
+    const supRef = projectContext.supabaseProjectRef?.trim();
+    const supName = projectContext.supabaseProjectName?.trim();
+    const supOrg = projectContext.supabaseOrganizationId?.trim();
+    if (supRef) trimmed.supabaseProjectRef = supRef;
+    if (supName) trimmed.supabaseProjectName = supName;
+    if (supOrg) trimmed.supabaseOrganizationId = supOrg;
     if (!Object.keys(trimmed).length) return undefined;
     if (trimmed.githubRepoUrl) {
       const status = projectContext.githubConnectionStatus?.trim();
@@ -332,18 +466,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     const updatedAt = projectContext.projectConnectionsUpdatedAt?.trim();
     if (updatedAt) trimmed.projectConnectionsUpdatedAt = updatedAt;
     if (oauthConnections.github) trimmed.githubConnectionStatus = "connected";
-    // Supabase ek metadata
-    const supRef = projectContext.supabaseProjectRef?.trim();
-    const supName = projectContext.supabaseProjectName?.trim();
-    const supOrg = projectContext.supabaseOrganizationId?.trim();
-    if (supRef) trimmed.supabaseProjectRef = supRef;
-    if (supName) trimmed.supabaseProjectName = supName;
-    if (supOrg) trimmed.supabaseOrganizationId = supOrg;
     if (oauthConnections.supabase) trimmed.supabaseConnectionStatus = "connected";
     return Object.keys(trimmed).length ? trimmed : undefined;
   };
 
   const hasAnyContext = CONNECTION_KEYS.some((k) => !!projectContext[k]?.trim())
+    || !!projectContext.notes?.trim()
     || !!projectContext.supabaseProjectRef?.trim()
     || !!oauthConnections.github || !!oauthConnections.vercel || !!oauthConnections.supabase;
 
@@ -452,11 +580,30 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const vpsHost = projectContext.vpsHost?.trim() ?? "";
   const localProjectPath = projectContext.localProjectPath?.trim() ?? "";
   const supabaseUrl = projectContext.supabaseProjectUrl?.trim() ?? "";
+  const notes = projectContext.notes?.trim() ?? "";
+  const connectedSourceCount = [
+    !!githubRepoUrl,
+    !!liveUrl,
+    !!vercelUrl,
+    !!vpsHost,
+    !!localProjectPath,
+    !!supabaseUrl || !!projectContext.supabaseProjectRef?.trim(),
+  ].filter(Boolean).length;
+  const hasAnyConnection = connectedSourceCount > 0;
+  const sourceCountLabel = hasAnyConnection ? `Bağlı kaynak: ${connectedSourceCount}` : "Bağlı kaynak yok";
+  const analysisStateMessage = repoRequired
+    ? hasAnyConnection
+      ? "Kod analizi açık. Bağlı kaynaklar analizde kullanılacak."
+      : "Kod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder."
+    : hasAnyConnection
+      ? "Bağlantılar kayıtlı ancak bu analizde kullanılmayacak."
+      : "Kod deposu analizi kapalı. Bağlantılar saklanır ancak bu analizde kullanılmaz.";
 
   const repoNoticeItems = [
-    repoRequired && !hasAnyContext ? "Kod analizi için en az bir proje bağlantısı ekleyin." : "",
-    repoRequired && oauthConnections.github && githubRepoUrl ? "GitHub bağlı. Kod dosyaları analiz sırasında okunur." : "",
-    repoRequired && localProjectPath ? "Lokal proje yolu Claude Code görevlerine bağlam olarak eklenir." : "",
+    repoRequired && !hasAnyConnection ? "Kod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder." : "",
+    repoRequired && hasAnyConnection ? "Kod analizi açık. Bağlı kaynaklar analizde kullanılacak." : "",
+    repoRequired && githubRepoUrl ? "GitHub bağlı. Kod dosyaları analiz sırasında okunur." : "",
+    !repoRequired && hasAnyConnection ? "Bağlantılar kayıtlı ancak bu analizde kullanılmayacak." : "",
   ].filter(Boolean);
 
   // Wizard live preview
@@ -489,7 +636,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       id: `req-${Date.now()}`, projectName: projectName.trim(), requestType, priority,
       problem: problem.trim(), expectedOutput: OUTPUT_BY_TYPE[requestType],
       repoRequired, createdAt: new Date(), status: "analyzing",
-      attachments, projectContext: sanitizedContext(),
+      attachments, projectContext: repoRequired ? sanitizedContext() : undefined,
     });
   };
 
@@ -586,33 +733,47 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         <span className="text-sm text-slate-300 flex items-center gap-2 flex-wrap">
           Kod deposu analizi gerekli
           <span className="text-slate-500 text-xs font-normal">AI karar verirken GitHub repo/kod bağlamı gerekiyorsa açın.</span>
-          {repoRequired && (
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${
-              hasAnyContext
-                ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
-                : "border-red-300/30 bg-red-400/10 text-red-200"
-            }`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${hasAnyContext ? "bg-emerald-400" : "bg-red-400"}`} />
-              {hasAnyContext ? "Bağlantı var" : "Bağlantı yok"}
-            </span>
-          )}
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${
+            hasAnyConnection
+              ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
+              : "border-slate-500/45 bg-slate-700/45 text-slate-300"
+          }`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${hasAnyConnection ? "bg-emerald-400" : "bg-slate-500"}`} />
+            {sourceCountLabel}
+          </span>
+          <span className={repoRequired ? "text-emerald-200 text-xs font-normal" : "text-amber-200 text-xs font-normal"}>
+            {analysisStateMessage}
+          </span>
         </span>
       </div>
 
       {/* Proje Bağlantıları */}
-      {repoRequired && (
+      {repoRequired ? (
         <div className="rounded-lg border border-slate-500/45 bg-slate-700/30 p-4">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
             <h3 className="text-sm font-semibold text-slate-100">Proje Bağlantıları</h3>
-            {hasAnyContext && (
-              <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2 py-0.5 text-xs font-medium text-emerald-200">Bağlam eklendi</span>
-            )}
+            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+              hasAnyConnection
+                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
+                : "border-slate-500/45 bg-slate-800/55 text-slate-300"
+            }`}>
+              {sourceCountLabel}
+            </span>
           </div>
+          {repoNoticeItems.length > 0 && (
+            <div className="mb-3 space-y-2">
+              {repoNoticeItems.map((notice) => (
+                <div key={notice} className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+                  {notice}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
 
             {/* GitHub — OAuth */}
-            {!oauthConnections.github ? (
+            {!oauthConnections.github && !githubRepoUrl ? (
               <button type="button" onClick={() => { window.location.href = "/api/auth/github"; }}
                 className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
                 <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
@@ -621,17 +782,17 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                 GitHub ile Bağlan
               </button>
             ) : (
-              <button type="button" onClick={() => disconnect("github")}
+              <button type="button" onClick={() => oauthConnections.github ? disconnect("github") : clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}
                 className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer">
                 <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
                   <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/>
                 </svg>
-                {oauthConnections.github.label}
+                <span className="truncate max-w-[180px]">{githubRepoFullName || oauthConnections.github?.label || githubRepoUrl}</span>
               </button>
             )}
 
             {/* Vercel — OAuth */}
-            {!oauthConnections.vercel ? (
+            {!oauthConnections.vercel && !vercelUrl ? (
               <button type="button" onClick={() => { window.location.href = "/api/auth/vercel"; }}
                 className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
                 <svg viewBox="0 0 116 100" className="h-3.5 w-3.5 flex-shrink-0 fill-current">
@@ -640,17 +801,17 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                 Vercel ile Bağlan
               </button>
             ) : (
-              <button type="button" onClick={() => disconnect("vercel")}
+              <button type="button" onClick={() => oauthConnections.vercel ? disconnect("vercel") : clearContextKeys(["vercelProjectUrl"])}
                 className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer">
                 <svg viewBox="0 0 116 100" className="h-3.5 w-3.5 flex-shrink-0 fill-current">
                   <path d="M57.5 0L115 100H0L57.5 0z"/>
                 </svg>
-                {oauthConnections.vercel.label}
+                <span className="truncate max-w-[180px]">{oauthConnections.vercel?.label || vercelUrl}</span>
               </button>
             )}
 
             {/* Supabase — OAuth */}
-            {!oauthConnections.supabase ? (
+            {!oauthConnections.supabase && !supabaseUrl && !projectContext.supabaseProjectRef?.trim() ? (
               <button type="button" onClick={() => { window.location.href = "/api/auth/supabase"; }}
                 className="flex items-center gap-2 rounded-lg border border-slate-500/55 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-400/70 hover:bg-slate-700/80 cursor-pointer">
                 <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
@@ -658,7 +819,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                 </svg>
                 Supabase ile Bağlan
               </button>
-            ) : (
+            ) : oauthConnections.supabase ? (
               <div className="flex items-center gap-1.5">
                 <button type="button" onClick={openSupabaseProjectModal}
                   className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-400/15 cursor-pointer max-w-[260px]">
@@ -677,6 +838,14 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                   </svg>
                 </button>
               </div>
+            ) : (
+              <button type="button" onClick={() => clearContextKeys(["supabaseProjectUrl", "supabaseProjectRef", "supabaseProjectName", "supabaseOrganizationId", "supabaseConnectionStatus"])}
+                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer max-w-[220px]">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
+                  <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.686 14.1 1.762 14.1h9.34c.487 0 .882.394.882.88l.016 8.044c.015.985 1.26 1.409 1.873.636l9.262-11.653c.663-.837.078-2.05-.998-2.05h-9.34a.881.881 0 0 1-.882-.88L11.9 1.036z"/>
+                </svg>
+                <span className="truncate">{projectContext.supabaseProjectName || projectContext.supabaseProjectRef || supabaseUrl}</span>
+              </button>
             )}
 
             {/* Canlı Site — manual */}
@@ -742,7 +911,101 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
           </div>
         </div>
+      ) : (
+        <div className="rounded-lg border border-slate-500/35 bg-slate-800/35 p-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-sm font-semibold text-slate-200">Proje Bağlantıları</h3>
+            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+              hasAnyConnection
+                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
+                : "border-slate-500/45 bg-slate-900/35 text-slate-300"
+            }`}>
+              {sourceCountLabel}
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-amber-200">
+            Kod deposu analizi kapalı. Bağlantılar saklanır ancak bu analizde kullanılmaz.
+          </p>
+        </div>
       )}
+
+      <details className="rounded-lg border border-slate-500/25 bg-slate-950/10 p-3">
+        <summary className="cursor-pointer select-none text-xs font-semibold text-slate-400">
+          Gelişmiş manuel düzenleme
+        </summary>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">GitHub Repo URL</label>
+            <input
+              type="url"
+              value={projectContext.githubRepoUrl ?? ""}
+              onChange={(e) => updateContext("githubRepoUrl", e.target.value)}
+              placeholder="https://github.com/onursuay/coinbot"
+              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Canlı Site URL</label>
+            <input
+              type="url"
+              value={projectContext.liveUrl ?? ""}
+              onChange={(e) => updateContext("liveUrl", e.target.value)}
+              placeholder="https://coin.onursuay.com"
+              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Vercel Project URL</label>
+            <input
+              type="url"
+              value={projectContext.vercelProjectUrl ?? ""}
+              onChange={(e) => updateContext("vercelProjectUrl", e.target.value)}
+              placeholder="https://vercel.com/onur-suay/coinbot"
+              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">VPS / Worker Bilgisi</label>
+            <input
+              type="text"
+              value={projectContext.vpsHost ?? ""}
+              onChange={(e) => updateContext("vpsHost", e.target.value)}
+              placeholder="Hostinger VPS, Docker worker, /opt/coinbot"
+              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Lokal Proje Yolu</label>
+            <input
+              type="text"
+              value={projectContext.localProjectPath ?? ""}
+              onChange={(e) => updateContext("localProjectPath", e.target.value)}
+              placeholder="/Users/onursuay/Desktop/Onur Suay/Web Siteleri/coinbot"
+              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Supabase Project URL</label>
+            <input
+              type="url"
+              value={projectContext.supabaseProjectUrl ?? ""}
+              onChange={(e) => updateContext("supabaseProjectUrl", e.target.value)}
+              placeholder="https://supabase.com/dashboard/project/..."
+              className="w-full rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 mb-1">Ek Not</label>
+            <textarea
+              value={projectContext.notes ?? ""}
+              onChange={(e) => updateContext("notes", e.target.value)}
+              placeholder="Branch adı, deployment ortamı, kritik kısıtlar veya AI'a iletilmesi gereken diğer bağlam bilgisi..."
+              rows={2}
+              className="w-full resize-none rounded-lg border border-slate-600/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-600 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+            />
+          </div>
+        </div>
+      </details>
 
       {/* Submit */}
       <button type="submit" disabled={isLoading || !projectName.trim() || !problem.trim()}

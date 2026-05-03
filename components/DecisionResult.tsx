@@ -354,6 +354,12 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
                 <ConfidenceBadge score={gemini.confidenceScore} />
               </div>
             </div>
+            {result.geminiSource !== "live" && result.geminiError && (
+              <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100 leading-relaxed">
+                <span className="font-semibold">Gemini canlı çalışmadı:</span>{" "}
+                <span className="break-all">{result.geminiError}</span>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
@@ -634,6 +640,47 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Sonraki Aksiyon</h4>
             <p className="font-medium text-emerald-100 bg-emerald-400/10 rounded-lg px-4 py-3 border border-emerald-300/20">{result.finalVerdict.nextAction}</p>
           </section>
+
+          {/* Bağlantı Kullanımı — debug özeti */}
+          {result.connectionUsageSummary && (() => {
+            const s = result.connectionUsageSummary;
+            const rows: Array<[string, string, "ok" | "warn" | "off"]> = [
+              ["Kod analizi toggle", s.repoRequired ? "Açık" : "Kapalı", s.repoRequired ? "ok" : "off"],
+              ["GitHub repo URL", s.hasGithubRepoUrl ? "Var" : "Yok", s.hasGithubRepoUrl ? "ok" : s.repoRequired ? "warn" : "off"],
+              ["GitHub kod bağlamı", s.githubContextFetched ? `Okundu (${s.githubContextFileCount} dosya)` : (s.githubContextError ? `Hata: ${s.githubContextError}` : "Çekilmedi"), s.githubContextFetched ? "ok" : s.repoRequired && s.hasGithubRepoUrl ? "warn" : "off"],
+              ["Gemini API key", s.hasGeminiKey ? "Var" : "Yok", s.hasGeminiKey ? "ok" : "warn"],
+              ["Gemini durumu", s.geminiSource === "live" ? "Canlı" : (s.geminiError ? `Mock (${s.geminiError})` : "Mock"), s.geminiSource === "live" ? "ok" : "warn"],
+              ["Supabase bağlamı", s.hasSupabaseContext ? "Var" : "Yok", s.hasSupabaseContext ? "ok" : "off"],
+              ["Lokal yol", s.hasLocalPath ? "Var" : "Yok", s.hasLocalPath ? "ok" : "off"],
+              ["Canlı URL", s.hasLiveUrl ? "Var" : "Yok", s.hasLiveUrl ? "ok" : "off"],
+              ["Vercel", s.hasVercelUrl ? "Var" : "Yok", s.hasVercelUrl ? "ok" : "off"],
+              ["VPS / Worker", s.hasVpsHost ? "Var" : "Yok", s.hasVpsHost ? "ok" : "off"],
+            ];
+            const tone = (t: "ok" | "warn" | "off") =>
+              t === "ok" ? "text-emerald-200" : t === "warn" ? "text-amber-200" : "text-slate-500";
+            const usedInAnalysis = s.repoRequired;
+            return (
+              <>
+                <div className="border-t border-slate-600/35" />
+                <section>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Bağlantı Kullanımı</h4>
+                  <p className="text-xs text-slate-400 mb-2">
+                    {usedInAnalysis
+                      ? "Kod analizi açık. Aşağıdaki bağlı kaynaklar prompta dahil edildi."
+                      : "Kod analizi kapalı. Bağlantılar kayıtlı ancak bu analizde kullanılmadı."}
+                  </p>
+                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                    {rows.map(([label, value, t]) => (
+                      <li key={label} className="flex flex-wrap gap-x-2">
+                        <span className="text-slate-500 min-w-[170px]">{label}:</span>
+                        <span className={`break-all ${tone(t)}`}>{value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </>
+            );
+          })()}
 
           {/* Referans Dosyalar */}
           {request.attachments && request.attachments.length > 0 && (

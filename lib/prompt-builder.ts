@@ -177,7 +177,7 @@ function buildProjectContextSection(req: DecisionRequest): string {
   );
 
   if (req.repoRequired && !hasContext) {
-    return `\n\n## Proje Bağlamı\n_Kod analizi istendi ancak proje bağlantısı eklenmedi. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder._`;
+    return `\n\n## Proje Bağlamı\n_Kod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder._`;
   }
 
   if (!hasContext) return "";

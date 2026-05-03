@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { AIAnalysis, AnalysisSource, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict, RepoContextSource } from "@/types/decision";
+import { AIAnalysis, AnalysisSource, ConnectionUsageSummary, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict, RepoContextSource } from "@/types/decision";
 import { generateMockDecision } from "@/lib/mock-decision";
 import { generatePromptOutput } from "@/lib/prompt-builder";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -375,7 +375,13 @@ async function callGeminiAnalysis(prompt: string, apiKey: string): Promise<strin
     }),
   });
   if (!res.ok) {
-    throw new Error(`Gemini API ${res.status}`);
+    let detail = "";
+    try {
+      const body = await res.text();
+      const trimmed = body.trim().slice(0, 240);
+      if (trimmed) detail = ` — ${trimmed}`;
+    } catch {}
+    throw new Error(`Gemini API ${res.status} (model=${GEMINI_MODEL})${detail}`);
   }
   const data = (await res.json()) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -535,6 +541,18 @@ export async function POST(req: NextRequest) {
   // Pre-step: GitHub repo context (FAZ 2A) — repoRequired=true ve GitHub URL varsa.
   let repoContext: RepoContextSource | null = null;
   let githubBlock = "";
+  if (enrichedRequest.repoRequired && !enrichedRequest.projectContext?.githubRepoUrl?.trim()) {
+    repoContext = {
+      source: "github",
+      owner: "",
+      repo: "",
+      branch: "",
+      selectedFiles: [],
+      warnings: [],
+      fetchedAt: new Date().toISOString(),
+      errorMessage: "GitHub repo bağlantısı eklenmedi. Kod analizi yalnızca yazılı açıklama ve ek dosyalara dayandırılmıştır.",
+    };
+  }
   if (enrichedRequest.repoRequired && enrichedRequest.projectContext?.githubRepoUrl?.trim()) {
     try {
       const built = await buildRepoContext({
@@ -619,8 +637,11 @@ export async function POST(req: NextRequest) {
   // Step 3: Gemini bağlam denetimi (destekleyici, ana flow'u durdurmaz)
   let geminiAnalysis = mockGeminiAnalysis;
   let geminiSource: AnalysisSource = "mock";
+  let geminiError: string | undefined;
 
-  if (geminiKey) {
+  if (!geminiKey) {
+    geminiError = "GEMINI_API_KEY tanımlı değil; Gemini bağlam denetimi devre dışı.";
+  } else {
     try {
       const geminiText = await callGeminiAnalysis(
         buildGeminiPrompt(enrichedRequest, claudeAnalysis, codexAnalysis, githubBlock),
@@ -631,8 +652,13 @@ export async function POST(req: NextRequest) {
       const parseSucceeded = stripCodeFences(geminiText).match(/\{[\s\S]*\}/) !== null && parsed.summary !== mockGeminiAnalysis.summary;
       geminiAnalysis = parsed;
       geminiSource = parseSucceeded ? "live" : "mock";
+      if (!parseSucceeded) {
+        geminiError = `Gemini yanıtı JSON olarak parse edilemedi (model=${GEMINI_MODEL}).`;
+      }
     } catch (err) {
-      console.warn("[verdict-ai] Gemini error:", err instanceof Error ? err.message : "unknown");
+      const msg = err instanceof Error ? err.message : "bilinmeyen hata";
+      geminiError = msg;
+      console.warn("[verdict-ai] Gemini error:", msg);
     }
   }
 
@@ -666,6 +692,23 @@ export async function POST(req: NextRequest) {
     geminiAnalysis
   );
 
+  const ctx = enrichedRequest.projectContext;
+  const connectionUsageSummary: ConnectionUsageSummary = {
+    repoRequired: !!enrichedRequest.repoRequired,
+    hasGithubRepoUrl: !!ctx?.githubRepoUrl?.trim(),
+    githubContextFetched: !!repoContext && !repoContext.errorMessage && repoContext.selectedFiles.length > 0,
+    githubContextFileCount: repoContext?.selectedFiles.length ?? 0,
+    ...(repoContext?.errorMessage ? { githubContextError: repoContext.errorMessage } : {}),
+    hasGeminiKey: !!geminiKey,
+    geminiSource,
+    ...(geminiError ? { geminiError } : {}),
+    hasSupabaseContext: !!(ctx?.supabaseProjectUrl?.trim() || ctx?.supabaseProjectRef?.trim()),
+    hasLocalPath: !!ctx?.localProjectPath?.trim(),
+    hasLiveUrl: !!ctx?.liveUrl?.trim(),
+    hasVercelUrl: !!ctx?.vercelProjectUrl?.trim(),
+    hasVpsHost: !!ctx?.vpsHost?.trim(),
+  };
+
   const finalResult: DecisionResult = {
     ...mockResult,
     analyses: mockResult.analyses.map((a) => {
@@ -680,7 +723,9 @@ export async function POST(req: NextRequest) {
     codexSource,
     judgeSource,
     geminiSource,
+    ...(geminiError ? { geminiError } : {}),
     ...(repoContext ? { repoContext } : {}),
+    connectionUsageSummary,
   };
 
   // Step 4: Supabase kayıt (env yoksa veya hata olursa sessizce atla)
