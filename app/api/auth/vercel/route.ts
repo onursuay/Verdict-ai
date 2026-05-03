@@ -10,9 +10,7 @@ export async function GET() {
   const state = randomBytes(16).toString("hex");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-  const url = new URL("https://api.vercel.com/v2/oauth/authorize");
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", `${appUrl}/api/auth/vercel/callback`);
+  const url = new URL("https://vercel.com/integrations/verdictai/add");
   url.searchParams.set("state", state);
 
   const response = NextResponse.redirect(url.toString());
