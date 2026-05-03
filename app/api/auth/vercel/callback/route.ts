@@ -23,12 +23,12 @@ export async function GET(req: NextRequest) {
         client_id: clientId,
         client_secret: clientSecret,
         code,
-        redirect_uri: `${appUrl}/api/auth/vercel/callback`,
       }).toString(),
     });
-    const tokenData = (await tokenRes.json()) as { access_token?: string; error?: string };
+    const tokenData = (await tokenRes.json()) as { access_token?: string; error?: string; error_description?: string };
     if (!tokenData.access_token) {
-      return NextResponse.redirect(`${appUrl}/?vercel_error=token_failed`);
+      const reason = encodeURIComponent(tokenData.error ?? "unknown");
+      return NextResponse.redirect(`${appUrl}/?vercel_error=token_failed&reason=${reason}`);
     }
 
     const userRes = await fetch("https://api.vercel.com/v2/user", {
