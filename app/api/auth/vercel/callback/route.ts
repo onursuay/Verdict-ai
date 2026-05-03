@@ -7,7 +7,9 @@ export async function GET(req: NextRequest) {
   const savedState = req.cookies.get("vercel_oauth_state")?.value;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-  if (!code || !state || state !== savedState) {
+  // Vercel Marketplace Integration flow doesn't pass state back — skip check if no cookie is set
+  const stateOk = !savedState || (state && state === savedState);
+  if (!code || !stateOk) {
     return NextResponse.redirect(`${appUrl}/?vercel_error=state_mismatch`);
   }
 
