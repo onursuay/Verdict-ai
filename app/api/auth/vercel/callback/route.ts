@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const code = searchParams.get("code");
+  const next = searchParams.get("next") ?? "";
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   if (!code) {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
         code,
       }).toString(),
     });
-    const tokenData = (await tokenRes.json()) as { access_token?: string; error?: string; error_description?: string };
+    const tokenData = (await tokenRes.json()) as { access_token?: string; error?: string };
     if (!tokenData.access_token) {
       const reason = encodeURIComponent(tokenData.error ?? "unknown");
       return NextResponse.redirect(`${appUrl}/?vercel_error=token_failed&reason=${reason}`);
@@ -37,26 +38,24 @@ export async function GET(req: NextRequest) {
     const userData = (await userRes.json()) as { user?: { username?: string; name?: string } };
     const username = userData.user?.username ?? userData.user?.name ?? "";
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
-<script>
-  var data = { type: "vercel_connected", username: ${JSON.stringify(username)} };
-  if (window.opener) {
-    window.opener.postMessage(data, ${JSON.stringify(appUrl)});
-    window.close();
-  } else {
-    window.location.href = ${JSON.stringify(`${appUrl}/?vercel_connected=1&vercel_username=${encodeURIComponent(username)}`)};
-  }
-<\/script>
-</body></html>`;
+    // Redirect popup to `next` (tells Vercel installation succeeded)
+    // Also store username in a readable cookie so VerdictAI can pick it up on next load
+    const destination = next || `${appUrl}/?vercel_connected=1&vercel_username=${encodeURIComponent(username)}`;
+    const response = NextResponse.redirect(destination);
 
-    const response = new NextResponse(html, {
-      headers: { "Content-Type": "text/html" },
-    });
     response.cookies.set("vercel_access_token", tokenData.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 30,
+      path: "/",
+    });
+    // Non-httpOnly cookie so client JS can read it and update localStorage
+    response.cookies.set("vercel_pending_user", username, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 5,
       path: "/",
     });
     response.cookies.delete("vercel_oauth_state");

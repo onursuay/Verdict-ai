@@ -187,21 +187,23 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     setOauthConnections(updated);
   }, []);
 
-  // Listen for OAuth popup messages (Vercel Marketplace popup flow)
+  // Pick up Vercel connection set by Marketplace popup (via non-httpOnly cookie)
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
-      if (e.data?.type === "vercel_connected") {
-        const conn: OAuthConnection = { label: e.data.username ?? "", connectedAt: new Date().toISOString() };
-        setOauthConnections((prev) => {
-          const next = { ...prev, vercel: conn };
-          try { localStorage.setItem("verdict_oauth", JSON.stringify(next)); } catch {}
-          return next;
-        });
-      }
+    const getCookie = (name: string) => {
+      const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+      return match ? decodeURIComponent(match[1]) : null;
     };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
+    const pendingUser = getCookie("vercel_pending_user");
+    if (pendingUser) {
+      // Clear the cookie
+      document.cookie = "vercel_pending_user=; Max-Age=0; path=/";
+      const conn: OAuthConnection = { label: pendingUser, connectedAt: new Date().toISOString() };
+      setOauthConnections((prev) => {
+        const next = { ...prev, vercel: conn };
+        try { localStorage.setItem("verdict_oauth", JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
   }, []);
 
   const disconnect = async (service: keyof OAuthConnections) => {
