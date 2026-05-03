@@ -3,8 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const code = searchParams.get("code");
-  const state = searchParams.get("state");
-  const savedState = req.cookies.get("vercel_oauth_state")?.value;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   if (!code) {
@@ -39,9 +37,21 @@ export async function GET(req: NextRequest) {
     const userData = (await userRes.json()) as { user?: { username?: string; name?: string } };
     const username = userData.user?.username ?? userData.user?.name ?? "";
 
-    const response = NextResponse.redirect(
-      `${appUrl}/?vercel_connected=1&vercel_username=${encodeURIComponent(username)}`
-    );
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
+<script>
+  var data = { type: "vercel_connected", username: ${JSON.stringify(username)} };
+  if (window.opener) {
+    window.opener.postMessage(data, ${JSON.stringify(appUrl)});
+    window.close();
+  } else {
+    window.location.href = ${JSON.stringify(`${appUrl}/?vercel_connected=1&vercel_username=${encodeURIComponent(username)}`)};
+  }
+<\/script>
+</body></html>`;
+
+    const response = new NextResponse(html, {
+      headers: { "Content-Type": "text/html" },
+    });
     response.cookies.set("vercel_access_token", tokenData.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
