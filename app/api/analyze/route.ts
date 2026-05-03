@@ -11,6 +11,7 @@ export const runtime = "nodejs";
 
 const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-pro-preview";
 
 function stripCodeFences(text: string): string {
   return text.replace(/^```[\w]*\n?/gm, "").replace(/^```$/gm, "").trim();
@@ -53,6 +54,7 @@ function buildProjectContextBlock(req: DecisionRequest): string {
     !!ctx.vercelProjectUrl ||
     !!ctx.vpsHost ||
     !!ctx.supabaseProjectUrl ||
+    !!ctx.supabaseProjectRef ||
     !!ctx.notes
   );
 
@@ -69,7 +71,13 @@ function buildProjectContextBlock(req: DecisionRequest): string {
   if (ctx?.liveUrl) lines.push(`- Canlı URL: ${ctx.liveUrl} (canlı ortam)`);
   if (ctx?.vercelProjectUrl) lines.push(`- Vercel: ${ctx.vercelProjectUrl} (deploy ortamı)`);
   if (ctx?.vpsHost) lines.push(`- VPS / Worker: ${ctx.vpsHost} (runtime/worker bu ortamda)`);
-  if (ctx?.supabaseProjectUrl) lines.push(`- Supabase: ${ctx.supabaseProjectUrl} (veritabanı bağlamı)`);
+  if (ctx?.supabaseProjectRef || ctx?.supabaseProjectUrl) {
+    const status = ctx?.supabaseConnectionStatus === "connected" ? "OAuth bağlı" : "manuel URL";
+    const ref = ctx?.supabaseProjectRef ? ` ref=${ctx.supabaseProjectRef}` : "";
+    const name = ctx?.supabaseProjectName ? ` "${ctx.supabaseProjectName}"` : "";
+    const url = ctx?.supabaseProjectUrl ? ` ${ctx.supabaseProjectUrl}` : "";
+    lines.push(`- Supabase[${status}]:${name}${ref}${url} — bu fazda yalnızca proje metadata'sı bağlama eklenir; schema/veri okuma sonraki fazda yapılacak.`);
+  }
   if (ctx?.notes) lines.push(`- Notlar: ${ctx.notes}`);
 
   return `\n\nPROJE BAĞLAMI:\n${lines.join("\n")}`;
@@ -301,15 +309,114 @@ function parseCodexAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
   }
 }
 
+// ─── Gemini context reviewer prompt, API & parser ────────────────────────────
+
+function buildGeminiPrompt(
+  req: DecisionRequest,
+  claude: AIAnalysis,
+  codex: AIAnalysis,
+  githubBlock: string
+): string {
+  return `Sen Gemini bağlam denetçisisin. Görevin nihai karar vermek değil; talep, ek dosyalar (görsel/PDF/TXT) ve GitHub kod bağlamı arasındaki tutarlılığı denetlemek; Claude ve Codex analizlerine destek veya itiraz noktaları üretmektir. Çoklu ortam (görsel + metin + uzun bağlam) yorumlamada güçlüsün.
+
+TALEP:
+- Proje: ${req.projectName}
+- Talep Tipi: ${req.requestType}
+- Öncelik: ${req.priority}
+- Problem: ${req.problem}
+- Beklenen Çıktı: ${req.expectedOutput}
+- Repo Erişimi: ${req.repoRequired ? "Evet" : "Hayır"}${buildProjectContextBlock(req)}${githubBlock}
+
+CLAUDE MÜHENDİS ANALİZİ:
+- Özet: ${claude.summary}
+- Riskler: ${claude.risks.join("; ")}
+- Öneri: ${claude.recommendation}
+
+CODEX KOD DENETÇİSİ ANALİZİ:
+- Özet: ${codex.summary}
+- Riskler: ${codex.risks.join("; ")}
+- Öneri: ${codex.recommendation}
+
+Görevin:
+- Yazılı talep ile referans dosyalar/görseller arasındaki tutarlılığı değerlendir.
+- GitHub kod bağlamı varsa seçilmemiş ama riskli olabilecek alanlara dikkat çek.
+- Claude ve Codex'in atlamış olabileceği bağlam noktaları varsa belirt.
+- Nihai karar verme; sadece destek veya itiraz noktaları üret.
+
+Yanıtın yalnızca aşağıdaki JSON yapısından oluşmalı; başka hiçbir metin ekleme:
+
+{
+  "title": "kısa bağlam denetimi başlığı (en fazla 60 karakter)",
+  "summary": "bağlam tutarlılığı özeti (2-3 cümle, Türkçe)",
+  "strengths": ["bağlamın güçlü yönü 1", "bağlamın güçlü yönü 2"],
+  "risks": ["bağlam riski 1", "bağlam riski 2"],
+  "objections": ["destek/itiraz noktası 1", "destek/itiraz noktası 2"],
+  "recommendation": "bağlam denetçisi önerisi (Türkçe)",
+  "confidenceScore": 75
+}
+
+Kurallar:
+- Tüm değerler Türkçe olacak
+- confidenceScore 0-100 arası tamsayı olacak
+- Karar verme yetkisi senin değil; sen yalnızca bağlam denetçisisin
+- Sadece JSON döndür${buildAttachmentContext(req.attachments)}`;
+}
+
+async function callGeminiAnalysis(prompt: string, apiKey: string): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Gemini API ${res.status}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  return text;
+}
+
+function parseGeminiAnalysis(text: string, fallback: AIAnalysis): AIAnalysis {
+  try {
+    const match = stripCodeFences(text).match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+    const p = JSON.parse(match[0]);
+    return {
+      role: "gemini_context_reviewer",
+      title: typeof p.title === "string" ? p.title : fallback.title,
+      summary: typeof p.summary === "string" ? p.summary : fallback.summary,
+      strengths: Array.isArray(p.strengths) ? p.strengths.map(String) : fallback.strengths,
+      risks: Array.isArray(p.risks) ? p.risks.map(String) : fallback.risks,
+      objections: Array.isArray(p.objections) ? p.objections.map(String) : fallback.objections,
+      recommendation: typeof p.recommendation === "string" ? p.recommendation : fallback.recommendation,
+      confidenceScore:
+        typeof p.confidenceScore === "number"
+          ? Math.max(0, Math.min(100, Math.round(p.confidenceScore)))
+          : fallback.confidenceScore,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 // ─── OpenAI judge prompt & parser ────────────────────────────────────────────
 
 function buildJudgePrompt(
   req: DecisionRequest,
   claude: AIAnalysis,
   codex: AIAnalysis,
+  gemini: AIAnalysis,
   githubBlock: string
 ): string {
-  return `Sen yazılım mühendisliği kararlarında hakem rolünde deneyimli bir teknik direktörüsün. Aşağıdaki talep ve iki bağımsız AI analizini değerlendirip SADECE geçerli JSON formatında final karar ver.
+  return `Sen yazılım mühendisliği kararlarında hakem rolünde deneyimli bir teknik direktörüsün. Aşağıdaki talep ve üç bağımsız AI analizini değerlendirip SADECE geçerli JSON formatında final karar ver.
 
 TALEP:
 - Proje: ${req.projectName}
@@ -331,7 +438,16 @@ CODEX KOD DENETÇİSİ ANALİZİ:
 - Öneri: ${codex.recommendation}
 - Güven Skoru: %${codex.confidenceScore}
 
-Bu iki analizi sentezleyerek bağımsız bir hakem kararı ver. Analizleri birebir kopyalama, kendi değerlendirmeni ekle.
+GEMINI BAĞLAM DENETİMİ (destekleyici görüş):
+- Özet: ${gemini.summary}
+- Bağlam Riskleri: ${gemini.risks.join("; ")}
+- İtiraz/Destek: ${gemini.objections.join("; ")}
+- Öneri: ${gemini.recommendation}
+- Güven Skoru: %${gemini.confidenceScore}
+
+NOT: Gemini bağlam denetimi destekleyici görüştür; nihai hakem senin kararındır. Gemini'nin bağlam uyarılarını dikkate al ama nihai kararı Claude ve Codex sentezi üzerinden kur.
+
+Bu üç analizi sentezleyerek bağımsız bir hakem kararı ver. Analizleri birebir kopyalama, kendi değerlendirmeni ekle.
 
 Yanıtın yalnızca aşağıdaki JSON yapısından oluşmalı; başka hiçbir metin ekleme:
 
@@ -393,14 +509,17 @@ export async function POST(req: NextRequest) {
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
   const rawAttachments = request.attachments ?? [];
   const hasImages = rawAttachments.some(a => a.visionStatus === "ready");
   const hasPdfs = rawAttachments.some(a => a.type === "application/pdf" && a.dataUrl);
   console.log("[verdict-ai] analyze", {
     hasAnthropicKey: !!anthropicKey,
     hasOpenAIKey: !!openaiKey,
+    hasGeminiKey: !!geminiKey,
     openaiModel: OPENAI_MODEL,
     claudeModel: CLAUDE_MODEL,
+    geminiModel: GEMINI_MODEL,
     attachments: rawAttachments.length,
     hasImages,
     hasPdfs,
@@ -455,6 +574,7 @@ export async function POST(req: NextRequest) {
   const mockResult = generateMockDecision(enrichedRequest);
   const mockClaudeAnalysis = mockResult.analyses.find((a) => a.role === "claude_engineer")!;
   const mockCodexAnalysis = mockResult.analyses.find((a) => a.role === "codex_reviewer")!;
+  const mockGeminiAnalysis = mockResult.analyses.find((a) => a.role === "gemini_context_reviewer")!;
 
   // Step 1: Claude mühendis analizi
   let claudeAnalysis = mockClaudeAnalysis;
@@ -496,7 +616,27 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Step 3: ChatGPT hakem final verdict (Claude + Codex analizlerini bağlam olarak alır)
+  // Step 3: Gemini bağlam denetimi (destekleyici, ana flow'u durdurmaz)
+  let geminiAnalysis = mockGeminiAnalysis;
+  let geminiSource: AnalysisSource = "mock";
+
+  if (geminiKey) {
+    try {
+      const geminiText = await callGeminiAnalysis(
+        buildGeminiPrompt(enrichedRequest, claudeAnalysis, codexAnalysis, githubBlock),
+        geminiKey
+      );
+      const parsed = parseGeminiAnalysis(geminiText, mockGeminiAnalysis);
+      // Live yalnızca parse başarılıysa: parser fallback ise summary mock ile aynı kalır
+      const parseSucceeded = stripCodeFences(geminiText).match(/\{[\s\S]*\}/) !== null && parsed.summary !== mockGeminiAnalysis.summary;
+      geminiAnalysis = parsed;
+      geminiSource = parseSucceeded ? "live" : "mock";
+    } catch (err) {
+      console.warn("[verdict-ai] Gemini error:", err instanceof Error ? err.message : "unknown");
+    }
+  }
+
+  // Step 4: ChatGPT hakem final verdict (Claude + Codex + Gemini analizlerini bağlam olarak alır)
   let finalVerdict = mockResult.finalVerdict;
   let judgeSource: AnalysisSource = "mock";
 
@@ -506,7 +646,7 @@ export async function POST(req: NextRequest) {
       const judgeCompletion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         max_tokens: 1024,
-        messages: [{ role: "user", content: buildJudgePrompt(enrichedRequest, claudeAnalysis, codexAnalysis, githubBlock) }],
+        messages: [{ role: "user", content: buildJudgePrompt(enrichedRequest, claudeAnalysis, codexAnalysis, geminiAnalysis, githubBlock) }],
       });
       const judgeText = judgeCompletion.choices[0]?.message?.content ?? "";
       finalVerdict = parseJudgeVerdict(judgeText, mockResult.finalVerdict);
@@ -522,7 +662,8 @@ export async function POST(req: NextRequest) {
     codexAnalysis,
     finalVerdict,
     processedAttachments,
-    repoContext
+    repoContext,
+    geminiAnalysis
   );
 
   const finalResult: DecisionResult = {
@@ -530,6 +671,7 @@ export async function POST(req: NextRequest) {
     analyses: mockResult.analyses.map((a) => {
       if (a.role === "claude_engineer") return claudeAnalysis;
       if (a.role === "codex_reviewer") return codexAnalysis;
+      if (a.role === "gemini_context_reviewer") return geminiAnalysis;
       return a;
     }),
     finalVerdict,
@@ -537,6 +679,7 @@ export async function POST(req: NextRequest) {
     claudeSource,
     codexSource,
     judgeSource,
+    geminiSource,
     ...(repoContext ? { repoContext } : {}),
   };
 
