@@ -130,7 +130,7 @@ type OAuthConnections = {
   supabase?: OAuthConnection;
 };
 
-type EditableContextKey = ConnectionKey | "notes";
+type EditableContextKey = Exclude<ConnectionKey, "githubRepoUrl"> | "notes";
 
 type WizardConfig = {
   title: string;
@@ -140,12 +140,6 @@ type WizardConfig = {
   multiline?: boolean;
 };
 const WIZARD_CONFIGS: Record<EditableContextKey, WizardConfig> = {
-  githubRepoUrl: {
-    title: "GitHub Repo Seç",
-    inputLabel: "Repo URL",
-    inputPlaceholder: "https://github.com/onursuay/coinbot",
-    inputType: "url",
-  },
   liveUrl: {
     title: "Canlı Site URL",
     inputLabel: "URL",
@@ -187,6 +181,19 @@ const WIZARD_CONFIGS: Record<EditableContextKey, WizardConfig> = {
 
 type WizardState = { keyName: EditableContextKey; inputValue: string };
 type PromptModalConfig = { title: string; body: string; source: "vps" | "local" };
+type GithubRepoItem = {
+  fullName: string;
+  htmlUrl: string;
+  private: boolean;
+  defaultBranch: string;
+  updatedAt: string | null;
+};
+type GithubRepoModalState = {
+  loading: boolean;
+  error: string | null;
+  repos: GithubRepoItem[];
+  query: string;
+};
 type SupabaseProjectItem = { ref: string; name: string; region: string; organization_id: string; created_at: string };
 type SupabaseProjectModalState = { loading: boolean; error: string | null; projects: SupabaseProjectItem[] };
 type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
@@ -223,28 +230,33 @@ function ConnectedChip({
   label,
   onEdit,
   onDisconnect,
+  editLabel = "Değiştir",
   disconnectLabel = "Kes",
 }: {
   code: string;
   label: string;
   onEdit?: () => void;
   onDisconnect: () => void;
+  editLabel?: string;
   disconnectLabel?: "Kes" | "Sil";
 }) {
   return (
     <div className="inline-flex h-9 max-w-full items-center overflow-hidden rounded-lg border border-emerald-300/35 bg-emerald-400/10 text-emerald-100">
-      <button
-        type="button"
-        onClick={onEdit}
-        disabled={!onEdit}
-        title={label}
-        className="flex min-w-0 items-center gap-2 px-2.5 text-xs font-semibold disabled:cursor-default"
-      >
+      <div title={label} className="flex min-w-0 items-center gap-2 px-2.5 text-xs font-semibold">
         <span className="flex h-5 min-w-7 items-center justify-center rounded border border-emerald-300/30 bg-slate-950/25 px-1 text-[10px] font-black tracking-wide">
           {code}
         </span>
         <span className="truncate">{label}</span>
-      </button>
+      </div>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="h-full border-l border-emerald-300/25 px-2 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-400/15 hover:text-emerald-100"
+        >
+          {editLabel}
+        </button>
+      )}
       <button
         type="button"
         onClick={onDisconnect}
@@ -306,10 +318,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [wizard, setWizard] = useState<WizardState | null>(null);
   const [promptModal, setPromptModal] = useState<PromptModalConfig | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [githubRepoModal, setGithubRepoModal] = useState<GithubRepoModalState | null>(null);
   const [supabaseProjectModal, setSupabaseProjectModal] = useState<SupabaseProjectModalState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [formWarning, setFormWarning] = useState<string | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
 
   useEffect(() => {
@@ -453,13 +467,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     setProjectContext((prev) => {
       const next: ProjectContext = { ...prev, projectConnectionsUpdatedAt: new Date().toISOString() };
       if (value) { next[key] = value; } else { delete next[key]; }
-      if (key === "githubRepoUrl") {
-        const fullName = parseGithubFullName(value);
-        if (value) {
-          next.githubConnectionStatus = fullName ? "connected" : "manual";
-          if (fullName) { next.githubRepoFullName = fullName; } else { delete next.githubRepoFullName; }
-        } else { delete next.githubConnectionStatus; delete next.githubRepoFullName; }
-      }
       if (key === "liveUrl") {
         if (value) { next.liveUrlStatus = "not_checked"; } else { delete next.liveUrlStatus; }
       }
@@ -524,6 +531,67 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
   const openWizard = (keyName: EditableContextKey) =>
     setWizard({ keyName, inputValue: projectContext[keyName] ?? "" });
+
+  const openGithubRepoModal = async () => {
+    setFormWarning(null);
+    setGithubRepoModal({ loading: true, error: null, repos: [], query: "" });
+    try {
+      const res = await fetch("/api/github/repos", { cache: "no-store" });
+      const data = (await res.json()) as {
+        connected: boolean;
+        repos?: GithubRepoItem[];
+        error?: string;
+      };
+
+      if (!data.connected) {
+        setOauthConnections((prev) => {
+          if (!prev.github) return prev;
+          const next = { ...prev };
+          delete next.github;
+          try { localStorage.setItem("verdict_oauth", JSON.stringify(next)); } catch {}
+          return next;
+        });
+        setGithubRepoModal({
+          loading: false,
+          error: "GitHub repo listesi alınamadı; bağlantıyı yenile.",
+          repos: [],
+          query: "",
+        });
+        return;
+      }
+
+      if (!res.ok || data.error) {
+        setGithubRepoModal({
+          loading: false,
+          error: "GitHub repo listesi alınamadı; bağlantıyı yenile.",
+          repos: [],
+          query: "",
+        });
+        return;
+      }
+
+      setGithubRepoModal({ loading: false, error: null, repos: data.repos ?? [], query: "" });
+    } catch {
+      setGithubRepoModal({
+        loading: false,
+        error: "GitHub repo listesi alınamadı; bağlantıyı yenile.",
+        repos: [],
+        query: "",
+      });
+    }
+  };
+
+  const selectGithubRepo = (repo: GithubRepoItem) => {
+    setProjectContext((prev) => ({
+      ...prev,
+      githubRepoUrl: repo.htmlUrl,
+      githubRepoFullName: repo.fullName,
+      githubConnectionStatus: "connected",
+      projectConnectionsUpdatedAt: new Date().toISOString(),
+    }));
+    setFormWarning(null);
+    setGithubRepoModal(null);
+  };
 
   const openSupabaseProjectModal = async () => {
     setSupabaseProjectModal({ loading: true, error: null, projects: [] });
@@ -652,8 +720,8 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const hasAnyConnection = connectedSourceCount > 0;
   const sourceCountLabel = hasAnyConnection ? `Bağlı kaynak: ${connectedSourceCount}` : "Bağlı kaynak yok";
   const analysisStateMessage = repoRequired
-    ? hasGithubOAuthOnly && !hasAnyConnection
-      ? "GitHub hesabı bağlı ancak repo URL girilmedi — analiz sırasında kod bağlamı kullanılamaz."
+    ? hasGithubOAuthOnly
+      ? "GitHub hesabı bağlı ancak repo seçilmedi. Kod bağlamı için repo seçin."
       : hasAnyConnection
         ? "Kod analizi açık. Bağlı kaynaklar analizde kullanılacak."
         : "Kod analizi açık ancak proje bağlantısı yok. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder."
@@ -671,17 +739,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     if (!wizard) return null;
     const { keyName, inputValue } = wizard;
     const trimmed = inputValue.trim(); if (!trimmed) return null;
-    if (keyName === "githubRepoUrl") {
-      const parsed = parseGithubFullName(trimmed);
-      return parsed
-        ? <div className="mt-3 rounded-lg border border-emerald-300/25 bg-emerald-400/10 px-3 py-2.5">
-            <p className="text-xs text-slate-400 mb-1">Repo</p>
-            <p className="text-sm font-semibold text-emerald-100">{parsed}</p>
-          </div>
-        : <div className="mt-3 rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2.5">
-            <p className="text-xs text-amber-200 font-medium">URL formatı çözümlenemedi — ham URL kaydedilecek</p>
-          </div>;
-    }
     if (keyName === "liveUrl" && !isHttpUrl(trimmed))
       return <div className="mt-3 rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2.5">
         <p className="text-xs text-amber-200">Geçerli bir HTTP/HTTPS URL giriniz.</p>
@@ -692,6 +749,11 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectName.trim() || !problem.trim()) return;
+    if (repoRequired && hasGithubOAuthOnly) {
+      setFormWarning("GitHub hesabı bağlı ancak repo seçilmedi. Kod bağlamı için repo seçin.");
+      return;
+    }
+    setFormWarning(null);
     onSubmit({
       id: `req-${Date.now()}`, projectName: projectName.trim(), requestType, priority,
       problem: problem.trim(), expectedOutput: OUTPUT_BY_TYPE[requestType],
@@ -833,27 +895,18 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                 <ConnectedChip
                   code="GH"
                   label={githubLabel}
-                  onEdit={() => openWizard("githubRepoUrl")}
+                  onEdit={openGithubRepoModal}
                   onDisconnect={() => oauthConnections.github ? disconnect("github") : clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}
                 />
               )}
               {hasGithubOAuthOnly && (
-                <div className="inline-flex h-9 max-w-full items-center overflow-hidden rounded-lg border border-amber-300/40 bg-amber-400/10 text-amber-100">
-                  <button
-                    type="button"
-                    onClick={() => openWizard("githubRepoUrl")}
-                    title="Repo URL girin"
-                    className="flex min-w-0 items-center gap-2 px-2.5 text-xs font-semibold"
-                  >
-                    <span className="flex h-5 min-w-7 items-center justify-center rounded border border-amber-300/40 bg-slate-950/25 px-1 text-[10px] font-black tracking-wide">GH</span>
-                    <span className="truncate">{oauthConnections.github?.label || "GitHub"} · Repo URL gerekiyor</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => disconnect("github")}
-                    className="h-full border-l border-amber-300/25 px-2 text-[11px] font-semibold text-amber-200 transition hover:bg-red-400/15 hover:text-red-100"
-                  >Kes</button>
-                </div>
+                <ConnectedChip
+                  code="GH"
+                  label={oauthConnections.github?.label || "GitHub bağlı"}
+                  onEdit={openGithubRepoModal}
+                  editLabel="Repo Seç"
+                  onDisconnect={() => disconnect("github")}
+                />
               )}
               {liveUrl && (
                 <ConnectedChip
@@ -909,6 +962,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
           <div className="flex flex-wrap gap-2">
             {!hasGithubConnection && !hasGithubOAuthOnly && <ConnectButton onClick={() => { window.location.href = "/api/auth/github"; }}>GitHub Bağla</ConnectButton>}
+            {hasGithubOAuthOnly && <ConnectButton onClick={openGithubRepoModal}>Repo Seç</ConnectButton>}
             {!liveUrl && <ConnectButton onClick={() => openWizard("liveUrl")}>Canlı Site Bağla</ConnectButton>}
             {!hasVercelConnection && <ConnectButton onClick={() => { window.location.href = "/api/auth/vercel"; }}>Vercel Bağla</ConnectButton>}
             {!vpsHost && <ConnectButton onClick={() => openWizard("vpsHost")}>VPS Bağla</ConnectButton>}
@@ -916,6 +970,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {!hasSupabaseConnection && <ConnectButton onClick={() => { window.location.href = "/api/auth/supabase"; }}>Supabase Bağla</ConnectButton>}
             {!notes && <ConnectButton onClick={() => openWizard("notes")}>Not Ekle</ConnectButton>}
           </div>
+        </div>
+      )}
+
+      {formWarning && (
+        <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-100">
+          {formWarning}
         </div>
       )}
 
@@ -973,6 +1033,106 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                   Kaydet
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+
+    {/* GitHub Repo Picker Modal */}
+    {githubRepoModal && (() => {
+      const query = githubRepoModal.query.trim().toLowerCase();
+      const repos = query
+        ? githubRepoModal.repos.filter((repo) => repo.fullName.toLowerCase().includes(query))
+        : githubRepoModal.repos;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
+          <div className="w-full max-w-2xl rounded-xl border border-slate-500/45 bg-[#172033] shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-500/35 px-5 pb-3 pt-5">
+              <div>
+                <h3 className="text-base font-semibold text-slate-100">GitHub Repo Seç</h3>
+                <p className="mt-1 text-xs text-slate-500">Kod bağlamı seçilen repo üzerinden okunur.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGithubRepoModal(null)}
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-5 py-4">
+              <input
+                type="text"
+                value={githubRepoModal.query}
+                onChange={(e) => setGithubRepoModal((prev) => prev ? { ...prev, query: e.target.value } : prev)}
+                placeholder="Repo adı ara..."
+                className="mb-3 w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+              />
+
+              <div className="max-h-[56vh] overflow-y-auto">
+                {githubRepoModal.loading && (
+                  <p className="py-8 text-center text-sm text-slate-400">Repolar yükleniyor...</p>
+                )}
+
+                {!githubRepoModal.loading && githubRepoModal.error && (
+                  <div className="rounded-lg border border-red-300/25 bg-red-400/10 px-3 py-2.5 text-sm text-red-200">
+                    {githubRepoModal.error}
+                  </div>
+                )}
+
+                {!githubRepoModal.loading && !githubRepoModal.error && githubRepoModal.repos.length === 0 && (
+                  <p className="py-8 text-center text-sm text-slate-400">Erişilebilir GitHub reposu bulunamadı.</p>
+                )}
+
+                {!githubRepoModal.loading && !githubRepoModal.error && githubRepoModal.repos.length > 0 && repos.length === 0 && (
+                  <p className="py-8 text-center text-sm text-slate-400">Aramaya uygun repo bulunamadı.</p>
+                )}
+
+                {!githubRepoModal.loading && !githubRepoModal.error && repos.length > 0 && (
+                  <ul className="space-y-2">
+                    {repos.map((repo) => (
+                      <li key={repo.fullName}>
+                        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-500/45 bg-[#202b40] px-3 py-2.5">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-semibold text-slate-100">{repo.fullName}</span>
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                repo.private
+                                  ? "border-amber-300/30 bg-amber-400/10 text-amber-200"
+                                  : "border-emerald-300/25 bg-emerald-400/10 text-emerald-200"
+                              }`}>
+                                {repo.private ? "private" : "public"}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                              default branch: <span className="font-mono text-slate-400">{repo.defaultBranch}</span>
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => selectGithubRepo(repo)}
+                            className="flex-shrink-0 rounded-lg border border-emerald-300/70 bg-emerald-300 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-emerald-200"
+                          >
+                            Seç
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-500/35 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setGithubRepoModal(null)}
+                className="rounded-lg border border-slate-500/55 bg-slate-800/70 px-3 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-slate-400"
+              >
+                Kapat
+              </button>
             </div>
           </div>
         </div>
