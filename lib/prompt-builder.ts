@@ -172,6 +172,7 @@ function buildProjectContextSection(req: DecisionRequest): string {
     !!ctx.vercelProjectUrl ||
     !!ctx.vpsHost ||
     !!ctx.supabaseProjectUrl ||
+    !!ctx.supabaseProjectRef ||
     !!ctx.notes
   );
 
@@ -187,7 +188,15 @@ function buildProjectContextSection(req: DecisionRequest): string {
   if (ctx?.liveUrl) lines.push(`- Canlı URL: ${ctx.liveUrl}`);
   if (ctx?.vercelProjectUrl) lines.push(`- Vercel: ${ctx.vercelProjectUrl}`);
   if (ctx?.vpsHost) lines.push(`- VPS / Worker: ${ctx.vpsHost}`);
-  if (ctx?.supabaseProjectUrl) lines.push(`- Supabase: ${ctx.supabaseProjectUrl}`);
+  if (ctx?.supabaseProjectRef || ctx?.supabaseProjectUrl) {
+    const parts: string[] = [];
+    if (ctx?.supabaseConnectionStatus === "connected") parts.push("OAuth bağlı");
+    if (ctx?.supabaseProjectName) parts.push(`Proje: ${ctx.supabaseProjectName}`);
+    if (ctx?.supabaseProjectRef) parts.push(`Ref: ${ctx.supabaseProjectRef}`);
+    if (ctx?.supabaseProjectUrl) parts.push(`URL: ${ctx.supabaseProjectUrl}`);
+    lines.push(`- Supabase: ${parts.join(" · ")}`);
+    lines.push(`  _Not: Supabase bağlantısı varsa schema/veri okuma sonraki fazda yapılacaktır. Bu fazda yalnızca proje metadata'sı analize eklenir._`);
+  }
   if (ctx?.notes) lines.push(`- Notlar: ${ctx.notes}`);
 
   // Lokal yol varsa Claude Code'a klasör doğrulama talimatı.
@@ -211,7 +220,8 @@ export function generatePromptOutput(
   codex: AIAnalysis,
   verdict: FinalVerdict,
   attachments: DecisionAttachment[],
-  repoContext?: RepoContextSource | null
+  repoContext?: RepoContextSource | null,
+  gemini?: AIAnalysis | null
 ): PromptOutput {
   const isCoinBot = /coinbot|coin[_\s-]?bot/i.test(req.projectName);
 
@@ -276,7 +286,13 @@ ${claude.summary}
 
 ### Codex Denetçisi (%${codex.confidenceScore})
 ${codex.summary}
-Öneri: ${codex.recommendation}${typeSection}${attSection}${safetySection}
+Öneri: ${codex.recommendation}${gemini ? `
+
+### Gemini Bağlam Denetimi (%${gemini.confidenceScore})
+- Özet: ${gemini.summary}
+- Riskler: ${gemini.risks.join("; ")}
+- İtirazlar: ${gemini.objections.join("; ")}
+- Öneri: ${gemini.recommendation}` : ""}${typeSection}${attSection}${safetySection}
 
 ## İlk Adım
 ${verdict.nextAction}${reportSection}`;

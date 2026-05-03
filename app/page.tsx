@@ -134,7 +134,7 @@ export default function Home() {
         {view === "new" && (
           <div className="space-y-5">
             {/* AI Rolleri */}
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
                 {
                   name: "Claude Code",
@@ -149,6 +149,13 @@ export default function Home() {
                   icon: "🔍",
                   color: "bg-violet-400/10 border-violet-300/15 text-violet-100",
                   desc: "Kod & test risk değerlendirmesi",
+                },
+                {
+                  name: "Gemini",
+                  role: "Bağlam Denetçisi",
+                  icon: "🧭",
+                  color: "bg-amber-400/10 border-amber-300/15 text-amber-100",
+                  desc: "Görsel, dosya & uzun bağlam kontrolü",
                 },
                 {
                   name: "ChatGPT",

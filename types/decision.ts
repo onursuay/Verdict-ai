@@ -43,7 +43,7 @@ export type DecisionStatus =
   | "implementation_failed"
   | "review_required";
 
-export type AIRole = "chatgpt_judge" | "claude_engineer" | "codex_reviewer";
+export type AIRole = "chatgpt_judge" | "claude_engineer" | "codex_reviewer" | "gemini_context_reviewer";
 
 export interface DecisionFollowUp {
   id: string;
@@ -101,6 +101,10 @@ export interface ProjectContext {
   githubRepoFullName?: string;
   liveUrlStatus?: "not_checked" | "valid" | "invalid";
   projectConnectionsUpdatedAt?: string;
+  supabaseConnectionStatus?: "connected" | "not_connected" | "error";
+  supabaseProjectRef?: string;
+  supabaseProjectName?: string;
+  supabaseOrganizationId?: string;
 }
 
 export interface DecisionRequest {
@@ -147,6 +151,7 @@ export interface DecisionResult {
   claudeSource?: AnalysisSource;
   codexSource?: AnalysisSource;
   judgeSource?: AnalysisSource;
+  geminiSource?: AnalysisSource;
   saved?: boolean;
   recordId?: string;
   enrichedAttachments?: DecisionAttachment[];

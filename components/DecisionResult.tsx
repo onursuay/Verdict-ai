@@ -112,6 +112,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
 
   const claude = result.analyses.find((a) => a.role === "claude_engineer")!;
   const codex = result.analyses.find((a) => a.role === "codex_reviewer")!;
+  const gemini = result.analyses.find((a) => a.role === "gemini_context_reviewer");
 
   const badge = PRIORITY_BADGE[request.priority];
 
@@ -334,6 +335,73 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
         </DecisionCard>
       </div>
 
+      {/* Gemini Bağlam Denetimi */}
+      {gemini && (
+        <DecisionCard title="Gemini Bağlam Denetimi" icon="🧭" badge="Bağlam Denetçisi" badgeColor="amber">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <p className="text-xs text-slate-500 italic">{gemini.title}</p>
+              <div className="flex items-center gap-1.5">
+                {result.geminiSource === "live" ? (
+                  <span className="text-xs font-semibold bg-amber-400/10 text-amber-200 border border-amber-300/20 px-2 py-0.5 rounded-full">
+                    Canlı Bağlam
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold bg-slate-700/80 text-slate-300 border border-slate-500/40 px-2 py-0.5 rounded-full">
+                    Mock Bağlam
+                  </span>
+                )}
+                <ConfidenceBadge score={gemini.confidenceScore} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Özet
+                </p>
+                <p className="text-sm text-slate-300 leading-relaxed">{gemini.summary}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Bağlam Riskleri
+                </p>
+                <ul className="space-y-1.5">
+                  {gemini.risks.map((r, i) => (
+                    <li key={i} className="text-xs text-slate-300 flex items-start gap-1.5">
+                      <span className="text-amber-400 flex-shrink-0">•</span>
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            {gemini.objections.length > 0 && (
+              <div className="pt-3 border-t border-slate-600/35">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Destek / İtiraz
+                </p>
+                <ul className="space-y-1">
+                  {gemini.objections.map((o, i) => (
+                    <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
+                      <span className="text-amber-400 flex-shrink-0">!</span>
+                      {o}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="pt-3 border-t border-slate-600/35">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                Öneri
+              </p>
+              <p className="text-sm text-amber-100 bg-amber-400/10 rounded-lg p-3 border border-amber-300/20">
+                {gemini.recommendation}
+              </p>
+            </div>
+          </div>
+        </DecisionCard>
+      )}
+
       {/* Nihai Rapor */}
       <div id="verdict-report" className="bg-[#24324a]/92 rounded-2xl border border-slate-500/40 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-500/35 bg-white/[0.04]">
@@ -465,6 +533,7 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
               {[
                 { label: "Claude Code", source: result.claudeSource },
                 { label: "Codex Denetçi", source: result.codexSource },
+                { label: "Gemini Bağlam", source: result.geminiSource },
                 { label: "ChatGPT Hakem", source: result.judgeSource },
               ].map((ai) => (
                 <span key={ai.label} className={`text-xs px-2.5 py-1 rounded-full font-medium border ${ai.source === "live" ? "bg-emerald-400/10 text-emerald-200 border-emerald-300/20" : "bg-slate-700/70 text-slate-300 border-slate-500/40"}`}>
@@ -491,6 +560,37 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <p className="leading-relaxed">{codex.summary}</p>
             <p className="mt-1.5 text-cyan-100 font-medium">{codex.recommendation}</p>
           </section>
+
+          {gemini && (
+            <>
+              <div className="border-t border-slate-600/35" />
+              <section>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Gemini / Bağlam Denetimi</h4>
+                <p className="leading-relaxed">{gemini.summary}</p>
+                {gemini.risks.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold text-slate-500 mb-1">Bağlam Riskleri</p>
+                    <ul className="space-y-1">
+                      {gemini.risks.map((r, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm"><span className="text-amber-400 flex-shrink-0">•</span>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {gemini.objections.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold text-slate-500 mb-1">İtirazlar</p>
+                    <ul className="space-y-1">
+                      {gemini.objections.map((o, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm"><span className="text-orange-400 flex-shrink-0">!</span>{o}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="mt-1.5 text-amber-100 font-medium">{gemini.recommendation}</p>
+              </section>
+            </>
+          )}
 
           <div className="border-t border-slate-600/35" />
 

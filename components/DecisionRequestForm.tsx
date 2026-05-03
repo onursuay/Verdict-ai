@@ -95,6 +95,8 @@ const WIZARD_CONFIGS: Record<ConnectionKey, WizardConfig> = {
 
 type WizardState = { keyName: ConnectionKey; inputValue: string };
 type PromptModalConfig = { title: string; body: string; source: "vps" | "local" };
+type SupabaseProjectItem = { ref: string; name: string; region: string; organization_id: string; created_at: string };
+type SupabaseProjectModalState = { loading: boolean; error: string | null; projects: SupabaseProjectItem[] };
 type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
 type ActionVariant = "primary" | "secondary" | "danger" | "ghost";
 
@@ -156,7 +158,10 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [wizard, setWizard] = useState<WizardState | null>(null);
   const [promptModal, setPromptModal] = useState<PromptModalConfig | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [supabaseProjectModal, setSupabaseProjectModal] = useState<SupabaseProjectModalState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
   // Read all OAuth callback params on mount + restore from localStorage
   useEffect(() => {
@@ -180,11 +185,59 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       changed = true;
     }
 
-    if (changed) {
+    const supError = params.get("supabase_error");
+    if (supError) {
+      const map: Record<string, string> = {
+        not_configured: "Supabase OAuth yapılandırılmamış. Yöneticiye bildirin.",
+        encryption_missing: "Sunucu şifreleme anahtarı eksik. Yöneticiye bildirin.",
+        state_mismatch: "Güvenlik doğrulaması başarısız (state). Tekrar deneyin.",
+        missing_verifier: "PKCE verifier kayıp. Tekrar deneyin.",
+        missing_session: "Oturum bilgisi kayıp. Tekrar deneyin.",
+        token_failed: "Supabase token alınamadı. Tekrar deneyin.",
+        storage_failed: "Bağlantı kaydedilemedi. Tekrar deneyin.",
+        network: "Ağ hatası. Tekrar deneyin.",
+      };
+      setSupabaseError(map[supError] ?? "Supabase bağlantısı başarısız.");
+    }
+
+    if (changed || supError) {
       try { localStorage.setItem("verdict_oauth", JSON.stringify(updated)); } catch {}
       window.history.replaceState({}, "", window.location.pathname);
     }
     setOauthConnections(updated);
+  }, []);
+
+  // Sync Supabase connection state from server (DB) on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/supabase/connection", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { connected: boolean; accountLabel?: string | null };
+        if (cancelled) return;
+        if (data.connected) {
+          setOauthConnections((prev) => {
+            const conn: OAuthConnection = {
+              label: data.accountLabel ?? prev.supabase?.label ?? "",
+              connectedAt: prev.supabase?.connectedAt ?? new Date().toISOString(),
+            };
+            const next = { ...prev, supabase: conn };
+            try { localStorage.setItem("verdict_oauth", JSON.stringify(next)); } catch {}
+            return next;
+          });
+        } else {
+          setOauthConnections((prev) => {
+            if (!prev.supabase) return prev;
+            const next = { ...prev };
+            delete next.supabase;
+            try { localStorage.setItem("verdict_oauth", JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }
+      } catch { /* sessizce geç */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Pick up Vercel connection set by Marketplace popup (via non-httpOnly cookie)
@@ -216,10 +269,20 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         localStorage.setItem("verdict_oauth", JSON.stringify(obj));
       }
     } catch {}
-    await fetch(`/api/auth/${service}`, { method: "DELETE" });
+    if (service === "supabase") {
+      await fetch("/api/supabase/connection", { method: "DELETE" });
+    } else {
+      await fetch(`/api/auth/${service}`, { method: "DELETE" });
+    }
     if (service === "github") clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"]);
     if (service === "vercel") clearContextKeys(["vercelProjectUrl"]);
-    if (service === "supabase") clearContextKeys(["supabaseProjectUrl"]);
+    if (service === "supabase") clearContextKeys([
+      "supabaseProjectUrl",
+      "supabaseProjectRef",
+      "supabaseProjectName",
+      "supabaseOrganizationId",
+      "supabaseConnectionStatus",
+    ]);
   };
 
   const applyContextValue = (key: ConnectionKey, rawValue: string) => {
@@ -269,14 +332,62 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     const updatedAt = projectContext.projectConnectionsUpdatedAt?.trim();
     if (updatedAt) trimmed.projectConnectionsUpdatedAt = updatedAt;
     if (oauthConnections.github) trimmed.githubConnectionStatus = "connected";
+    // Supabase ek metadata
+    const supRef = projectContext.supabaseProjectRef?.trim();
+    const supName = projectContext.supabaseProjectName?.trim();
+    const supOrg = projectContext.supabaseOrganizationId?.trim();
+    if (supRef) trimmed.supabaseProjectRef = supRef;
+    if (supName) trimmed.supabaseProjectName = supName;
+    if (supOrg) trimmed.supabaseOrganizationId = supOrg;
+    if (oauthConnections.supabase) trimmed.supabaseConnectionStatus = "connected";
     return Object.keys(trimmed).length ? trimmed : undefined;
   };
 
   const hasAnyContext = CONNECTION_KEYS.some((k) => !!projectContext[k]?.trim())
+    || !!projectContext.supabaseProjectRef?.trim()
     || !!oauthConnections.github || !!oauthConnections.vercel || !!oauthConnections.supabase;
 
   const openWizard = (keyName: ConnectionKey) =>
     setWizard({ keyName, inputValue: projectContext[keyName] ?? "" });
+
+  const openSupabaseProjectModal = async () => {
+    setSupabaseProjectModal({ loading: true, error: null, projects: [] });
+    try {
+      const res = await fetch("/api/supabase/projects", { cache: "no-store" });
+      const data = (await res.json()) as { connected: boolean; projects: SupabaseProjectItem[]; error?: string };
+      if (!data.connected) {
+        setSupabaseProjectModal({ loading: false, error: "Supabase bağlantısı bulunamadı.", projects: [] });
+        return;
+      }
+      if (data.error) {
+        const errMsg = data.error === "token_expired"
+          ? "Supabase erişim token'ı süresi doldu. Lütfen yeniden bağlanın."
+          : data.error === "insufficient_scope"
+            ? "Bu hesabın Supabase proje listesi okuma izni yok."
+            : data.error === "rate_limit"
+              ? "Supabase API rate limit'e ulaşıldı. Birkaç dakika sonra tekrar deneyin."
+              : "Supabase API hatası.";
+        setSupabaseProjectModal({ loading: false, error: errMsg, projects: [] });
+        return;
+      }
+      setSupabaseProjectModal({ loading: false, error: null, projects: data.projects ?? [] });
+    } catch {
+      setSupabaseProjectModal({ loading: false, error: "Proje listesi alınamadı.", projects: [] });
+    }
+  };
+
+  const selectSupabaseProject = (p: SupabaseProjectItem) => {
+    setProjectContext((prev) => ({
+      ...prev,
+      supabaseProjectRef: p.ref,
+      supabaseProjectName: p.name,
+      supabaseOrganizationId: p.organization_id,
+      supabaseProjectUrl: `https://supabase.com/dashboard/project/${p.ref}`,
+      supabaseConnectionStatus: "connected",
+      projectConnectionsUpdatedAt: new Date().toISOString(),
+    }));
+    setSupabaseProjectModal(null);
+  };
 
   const wizardSave = () => {
     if (!wizard) return;
@@ -548,13 +659,24 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                 Supabase ile Bağlan
               </button>
             ) : (
-              <button type="button" onClick={() => disconnect("supabase")}
-                className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-red-300/40 hover:bg-red-400/10 hover:text-red-200 cursor-pointer">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
-                  <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.686 14.1 1.762 14.1h9.34c.487 0 .882.394.882.88l.016 8.044c.015.985 1.26 1.409 1.873.636l9.262-11.653c.663-.837.078-2.05-.998-2.05h-9.34a.881.881 0 0 1-.882-.88L11.9 1.036z"/>
-                </svg>
-                {oauthConnections.supabase.label}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={openSupabaseProjectModal}
+                  className="flex items-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-400/15 cursor-pointer max-w-[260px]">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 flex-shrink-0 fill-current">
+                    <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.686 14.1 1.762 14.1h9.34c.487 0 .882.394.882.88l.016 8.044c.015.985 1.26 1.409 1.873.636l9.262-11.653c.663-.837.078-2.05-.998-2.05h-9.34a.881.881 0 0 1-.882-.88L11.9 1.036z"/>
+                  </svg>
+                  <span className="truncate">
+                    {projectContext.supabaseProjectName ? projectContext.supabaseProjectName : (oauthConnections.supabase.label || "Bağlı") + " · Proje Seç"}
+                  </span>
+                </button>
+                <button type="button" onClick={() => disconnect("supabase")}
+                  title="Bağlantıyı Kes"
+                  className="flex items-center justify-center h-9 w-9 rounded-lg border border-red-300/30 bg-red-400/10 text-red-200 transition hover:border-red-300/55 hover:bg-red-400/20 cursor-pointer">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="6" y1="6" x2="18" y2="18" /><line x1="6" y1="18" x2="18" y2="6" />
+                  </svg>
+                </button>
+              </div>
             )}
 
             {/* Canlı Site — manual */}
@@ -670,6 +792,68 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         </div>
       );
     })()}
+
+    {/* Supabase Project Picker Modal */}
+    {supabaseProjectModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
+        <div className="w-full max-w-lg rounded-xl border border-slate-500/45 bg-[#172033] shadow-2xl">
+          <div className="px-5 pt-5 pb-3 border-b border-slate-500/35 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-100">Supabase Projesi Seç</h3>
+            <button type="button" onClick={() => setSupabaseProjectModal(null)}
+              className="text-slate-400 hover:text-slate-200 cursor-pointer">✕</button>
+          </div>
+          <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">
+            {supabaseProjectModal.loading && (
+              <p className="text-sm text-slate-400 py-6 text-center">Projeler yükleniyor...</p>
+            )}
+            {!supabaseProjectModal.loading && supabaseProjectModal.error && (
+              <div className="text-sm text-red-200 bg-red-400/10 border border-red-300/25 rounded-lg px-3 py-2.5">
+                {supabaseProjectModal.error}
+              </div>
+            )}
+            {!supabaseProjectModal.loading && !supabaseProjectModal.error && supabaseProjectModal.projects.length === 0 && (
+              <p className="text-sm text-slate-400 py-4 text-center">Bu Supabase hesabında proje bulunamadı.</p>
+            )}
+            {!supabaseProjectModal.loading && supabaseProjectModal.projects.length > 0 && (
+              <ul className="space-y-2">
+                {supabaseProjectModal.projects.map((p) => (
+                  <li key={p.ref}>
+                    <button type="button" onClick={() => selectSupabaseProject(p)}
+                      className="w-full text-left rounded-lg border border-slate-500/45 bg-[#202b40] px-3 py-2.5 hover:border-emerald-300/55 hover:bg-emerald-400/5 transition cursor-pointer">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-medium text-slate-100 text-sm">{p.name}</span>
+                        <span className="text-xs text-slate-500 font-mono">{p.ref}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {p.region}{p.organization_id ? ` · org ${p.organization_id}` : ""}
+                      </p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="px-5 py-3 border-t border-slate-500/35 flex justify-end">
+            <button type="button" onClick={() => setSupabaseProjectModal(null)}
+              className="rounded-lg border border-slate-500/55 bg-slate-800/70 px-3 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-slate-400">
+              Kapat
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Supabase error banner (URL params) */}
+    {supabaseError && (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4">
+        <div className="rounded-lg border border-red-300/30 bg-[#2a1518] text-red-100 px-4 py-3 shadow-2xl flex items-start gap-3">
+          <span className="text-red-300">⚠</span>
+          <div className="flex-1 text-sm">{supabaseError}</div>
+          <button type="button" onClick={() => setSupabaseError(null)}
+            className="text-red-200 hover:text-red-100 cursor-pointer">✕</button>
+        </div>
+      </div>
+    )}
 
     {/* Prompt Modal */}
     {promptModal && (

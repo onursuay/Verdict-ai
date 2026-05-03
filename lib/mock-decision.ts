@@ -101,6 +101,34 @@ export function generateMockDecision(request: DecisionRequest): DecisionResult {
     confidenceScore: confidenceByPriority(76, request.priority),
   };
 
+  const hasAttachments = (request.attachments?.length ?? 0) > 0;
+  const hasRepoHint = !!request.projectContext?.githubRepoUrl;
+
+  const geminiAnalysis: AIAnalysis = {
+    role: "gemini_context_reviewer",
+    title: "Gemini Bağlam Denetimi",
+    summary: `"${request.projectName}" talebinin bağlam tutarlılığı incelendi. ${
+      hasAttachments
+        ? "Eklenen referans dosyalar talep ile uyumlu görünüyor."
+        : "Ek referans dosya bulunmuyor; analiz yalnızca yazılı tanıma dayanmaktadır."
+    } ${hasRepoHint ? "GitHub repo bağlamı mevcut; kod tabanı bağlamı analize katkı sağlayacaktır." : "Repo bağlamı yok; kod tabanına özgü detaylar sınırlıdır."}`,
+    strengths: [
+      hasAttachments ? "Referans dosyalar bağlamı zenginleştiriyor" : "Yazılı tanım yeterince spesifik",
+      hasRepoHint ? "GitHub repo bağlamı kararı destekliyor" : "Bağlam yokluğu açıkça raporlanıyor",
+    ],
+    risks: [
+      hasRepoHint ? "Repo bağlamında okunmayan kritik dosyalar olabilir" : "Kod tabanı bağlamı eksik; varsayımlar artar",
+      hasAttachments ? "Görsel/PDF referansları kaynak doğruluğu açısından çapraz kontrol edilmeli" : "Görsel/dosya yokluğu UI/akış kararlarını zorlaştırır",
+    ],
+    objections: [
+      "Claude ve Codex önerileri birbirini doğruluyor; ek bir bağlam itirazı bulunmuyor",
+    ],
+    recommendation: hasRepoHint
+      ? "GitHub bağlamındaki seçilmemiş dosyalar gözden geçirilirse kararın güveni artar."
+      : "Karar uygulanmadan önce ilgili dosyaların kısa bir referans listesi eklenmeli.",
+    confidenceScore: confidenceByPriority(74, request.priority),
+  };
+
   const chatgptAnalysis: AIAnalysis = {
     role: "chatgpt_judge",
     title: "Hakem Ön Değerlendirmesi",
@@ -143,12 +171,14 @@ export function generateMockDecision(request: DecisionRequest): DecisionResult {
     claudeAnalysis,
     codexAnalysis,
     finalVerdict,
-    request.attachments ?? []
+    request.attachments ?? [],
+    null,
+    geminiAnalysis
   );
 
   return {
     requestId: request.id,
-    analyses: [claudeAnalysis, codexAnalysis, chatgptAnalysis],
+    analyses: [claudeAnalysis, codexAnalysis, geminiAnalysis, chatgptAnalysis],
     finalVerdict,
     promptOutput,
     createdAt: new Date(),

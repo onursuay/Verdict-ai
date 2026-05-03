@@ -38,3 +38,24 @@ create table if not exists implementation_tasks (
 );
 
 -- Status değerleri: queued | sent | running | completed | failed | review_required
+
+-- Migration: supabase_connections tablosu (Supabase OAuth bağlantıları)
+-- Token'lar AES-256-GCM ile şifrelenmiş olarak saklanır.
+create table if not exists supabase_connections (
+  id                       uuid        primary key default gen_random_uuid(),
+  provider                 text        not null default 'supabase',
+  user_key                 text        not null,
+  access_token_encrypted   text        not null,
+  refresh_token_encrypted  text,
+  expires_at               timestamptz,
+  scope                    text,
+  account_label            text,
+  organization_slug        text,
+  revoked                  boolean     not null default false,
+  created_at               timestamptz not null default now(),
+  updated_at               timestamptz not null default now()
+);
+
+create index if not exists supabase_connections_user_key_idx
+  on supabase_connections (user_key)
+  where revoked = false;
