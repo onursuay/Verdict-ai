@@ -38,8 +38,12 @@ const CONNECTION_KEYS: ConnectionKey[] = [
   "vercelProjectUrl", "vpsHost", "supabaseProjectUrl",
 ];
 
-// GitHub OAuth connection state (stored in localStorage)
-type GitHubOAuth = { login: string; connectedAt: string };
+type OAuthConnection = { label: string; connectedAt: string };
+type OAuthConnections = {
+  github?: OAuthConnection;
+  vercel?: OAuthConnection;
+  supabase?: OAuthConnection;
+};
 
 // Keys that go directly to input step (no OAuth step 1)
 const DIRECT_INPUT_KEYS: ConnectionKey[] = ["liveUrl", "vercelProjectUrl", "vpsHost", "localProjectPath", "supabaseProjectUrl"];
@@ -155,34 +159,55 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [repoRequired, setRepoRequired] = useState(false);
   const [attachments, setAttachments] = useState<DecisionAttachment[]>([]);
   const [projectContext, setProjectContext] = useState<ProjectContext>({});
-  const [githubOAuth, setGithubOAuth] = useState<GitHubOAuth | null>(null);
+  const [oauthConnections, setOauthConnections] = useState<OAuthConnections>({});
   const [wizard, setWizard] = useState<WizardState | null>(null);
   const [promptModal, setPromptModal] = useState<PromptModalConfig | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Read OAuth callback params + localStorage on mount
+  // Read all OAuth callback params on mount + restore from localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    let stored: OAuthConnections = {};
+    try { const s = localStorage.getItem("verdict_oauth"); if (s) stored = JSON.parse(s); } catch {}
+
+    let updated = { ...stored };
+    let changed = false;
+
     if (params.get("github_connected") === "1") {
-      const login = params.get("github_login") ?? "";
-      const connection: GitHubOAuth = { login, connectedAt: new Date().toISOString() };
-      try { localStorage.setItem("verdict_github_oauth", JSON.stringify(connection)); } catch {}
-      setGithubOAuth(connection);
-      window.history.replaceState({}, "", window.location.pathname);
-    } else {
-      try {
-        const stored = localStorage.getItem("verdict_github_oauth");
-        if (stored) setGithubOAuth(JSON.parse(stored));
-      } catch {}
+      updated.github = { label: params.get("github_login") ?? "", connectedAt: new Date().toISOString() };
+      changed = true;
     }
+    if (params.get("vercel_connected") === "1") {
+      updated.vercel = { label: params.get("vercel_username") ?? "", connectedAt: new Date().toISOString() };
+      changed = true;
+    }
+    if (params.get("supabase_connected") === "1") {
+      updated.supabase = { label: params.get("supabase_org") ?? "", connectedAt: new Date().toISOString() };
+      changed = true;
+    }
+
+    if (changed) {
+      try { localStorage.setItem("verdict_oauth", JSON.stringify(updated)); } catch {}
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    setOauthConnections(updated);
   }, []);
 
-  const disconnectGithub = async () => {
-    try { localStorage.removeItem("verdict_github_oauth"); } catch {}
-    setGithubOAuth(null);
-    clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"]);
-    await fetch("/api/auth/github", { method: "DELETE" });
+  const disconnect = async (service: keyof OAuthConnections) => {
+    setOauthConnections((prev) => { const next = { ...prev }; delete next[service]; return next; });
+    try {
+      const stored = localStorage.getItem("verdict_oauth");
+      if (stored) {
+        const obj: OAuthConnections = JSON.parse(stored);
+        delete obj[service];
+        localStorage.setItem("verdict_oauth", JSON.stringify(obj));
+      }
+    } catch {}
+    await fetch(`/api/auth/${service}`, { method: "DELETE" });
+    if (service === "github") clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"]);
+    if (service === "vercel") clearContextKeys(["vercelProjectUrl"]);
+    if (service === "supabase") clearContextKeys(["supabaseProjectUrl"]);
   };
 
   const applyContextValue = (key: ConnectionKey, rawValue: string) => {
@@ -231,11 +256,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     }
     const updatedAt = projectContext.projectConnectionsUpdatedAt?.trim();
     if (updatedAt) trimmed.projectConnectionsUpdatedAt = updatedAt;
-    if (githubOAuth) trimmed.githubConnectionStatus = "connected";
+    if (oauthConnections.github) trimmed.githubConnectionStatus = "connected";
     return Object.keys(trimmed).length ? trimmed : undefined;
   };
 
-  const hasAnyContext = CONNECTION_KEYS.some((k) => !!projectContext[k]?.trim()) || !!githubOAuth;
+  const hasAnyContext = CONNECTION_KEYS.some((k) => !!projectContext[k]?.trim())
+    || !!oauthConnections.github || !!oauthConnections.vercel || !!oauthConnections.supabase;
 
   const openWizard = (keyName: ConnectionKey) =>
     setWizard({ keyName, inputValue: projectContext[keyName] ?? "" });
@@ -306,7 +332,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
   const repoNoticeItems = [
     repoRequired && !hasAnyContext ? "Kod analizi için en az bir proje bağlantısı ekleyin." : "",
-    repoRequired && githubOAuth && githubRepoUrl ? "GitHub bağlı. Kod dosyaları analiz sırasında okunur." : "",
+    repoRequired && oauthConnections.github && githubRepoUrl ? "GitHub bağlı. Kod dosyaları analiz sırasında okunur." : "",
     repoRequired && localProjectPath ? "Lokal proje yolu Claude Code görevlerine bağlam olarak eklenir." : "",
   ].filter(Boolean);
 
@@ -492,28 +518,23 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {/* GitHub — OAuth */}
             {renderCard({
               icon: "GH", title: "GitHub",
-              connected: !!githubOAuth,
+              connected: !!oauthConnections.github,
               statusTone: "success",
-              value: githubOAuth
-                ? `${githubOAuth.login}${githubRepoFullName ? ` · ${githubRepoFullName}` : " · Repo seçilmedi"}`
+              value: oauthConnections.github
+                ? `${oauthConnections.github.label}${githubRepoFullName ? ` · ${githubRepoFullName}` : " · Repo seçilmedi"}`
                 : undefined,
-              actions: !githubOAuth ? (
-                <button type="button"
-                  onClick={() => { window.location.href = "/api/auth/github"; }}
+              actions: !oauthConnections.github ? (
+                <button type="button" onClick={() => { window.location.href = "/api/auth/github"; }}
                   className="flex items-center gap-2 rounded-lg border border-slate-300/35 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-100 transition hover:border-slate-300/60 hover:bg-slate-700/80 cursor-pointer">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
                     <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/>
                   </svg>
                   GitHub ile Bağlan
                 </button>
-              ) : (
-                <>
-                  <ActionButton onClick={() => openWizard("githubRepoUrl")}>
-                    {githubRepoUrl ? "Repo Değiştir" : "Repo Seç"}
-                  </ActionButton>
-                  <ActionButton variant="danger" onClick={disconnectGithub}>Bağlantıyı Kes</ActionButton>
-                </>
-              ),
+              ) : (<>
+                <ActionButton onClick={() => openWizard("githubRepoUrl")}>{githubRepoUrl ? "Repo Değiştir" : "Repo Seç"}</ActionButton>
+                <ActionButton variant="danger" onClick={() => disconnect("github")}>Bağlantıyı Kes</ActionButton>
+              </>),
             })}
 
             {/* Canlı Site */}
@@ -531,18 +552,26 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                   </>,
             })}
 
-            {/* Vercel */}
+            {/* Vercel — OAuth */}
             {renderCard({
               icon: "VC", title: "Vercel",
-              connected: !!vercelUrl,
+              connected: !!oauthConnections.vercel,
               statusTone: "info",
-              value: vercelUrl,
-              actions: !vercelUrl
-                ? <ActionButton variant="primary" onClick={() => openWizard("vercelProjectUrl")}>Bağlan</ActionButton>
-                : <>
-                    <ActionButton onClick={() => openWizard("vercelProjectUrl")}>Değiştir</ActionButton>
-                    <ActionButton variant="danger" onClick={() => clearContextKeys(["vercelProjectUrl"])}>Kes</ActionButton>
-                  </>,
+              value: oauthConnections.vercel
+                ? `${oauthConnections.vercel.label}${vercelUrl ? ` · ${vercelUrl.replace("https://vercel.com/", "")}` : " · Proje seçilmedi"}`
+                : undefined,
+              actions: !oauthConnections.vercel ? (
+                <button type="button" onClick={() => { window.location.href = "/api/auth/vercel"; }}
+                  className="flex items-center gap-2 rounded-lg border border-slate-300/35 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-100 transition hover:border-slate-300/60 hover:bg-slate-700/80 cursor-pointer">
+                  <svg viewBox="0 0 116 100" className="h-3.5 w-3.5 fill-current">
+                    <path d="M57.5 0L115 100H0L57.5 0z"/>
+                  </svg>
+                  Vercel ile Bağlan
+                </button>
+              ) : (<>
+                <ActionButton onClick={() => openWizard("vercelProjectUrl")}>{vercelUrl ? "Proje Değiştir" : "Proje Seç"}</ActionButton>
+                <ActionButton variant="danger" onClick={() => disconnect("vercel")}>Bağlantıyı Kes</ActionButton>
+              </>),
             })}
 
             {/* VPS */}
@@ -575,18 +604,26 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                   </>,
             })}
 
-            {/* Supabase */}
+            {/* Supabase — OAuth */}
             {renderCard({
               icon: "SB", title: "Supabase",
-              connected: !!supabaseUrl,
+              connected: !!oauthConnections.supabase,
               statusTone: "info",
-              value: supabaseUrl,
-              actions: !supabaseUrl
-                ? <ActionButton variant="primary" onClick={() => openWizard("supabaseProjectUrl")}>Bağlan</ActionButton>
-                : <>
-                    <ActionButton onClick={() => openWizard("supabaseProjectUrl")}>Değiştir</ActionButton>
-                    <ActionButton variant="danger" onClick={() => clearContextKeys(["supabaseProjectUrl"])}>Kes</ActionButton>
-                  </>,
+              value: oauthConnections.supabase
+                ? `${oauthConnections.supabase.label}${supabaseUrl ? ` · ${supabaseUrl.split("/project/")[1] ?? ""}` : " · Proje seçilmedi"}`
+                : undefined,
+              actions: !oauthConnections.supabase ? (
+                <button type="button" onClick={() => { window.location.href = "/api/auth/supabase"; }}
+                  className="flex items-center gap-2 rounded-lg border border-emerald-400/35 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100 transition hover:border-emerald-400/60 hover:bg-emerald-400/15 cursor-pointer">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                    <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.101 12.888.686 14.1 1.762 14.1h9.34c.487 0 .882.394.882.88l.016 8.044c.015.985 1.26 1.409 1.873.636l9.262-11.653c.663-.837.078-2.05-.998-2.05h-9.34a.881.881 0 0 1-.882-.88L11.9 1.036z"/>
+                  </svg>
+                  Supabase ile Bağlan
+                </button>
+              ) : (<>
+                <ActionButton onClick={() => openWizard("supabaseProjectUrl")}>{supabaseUrl ? "Proje Değiştir" : "Proje Seç"}</ActionButton>
+                <ActionButton variant="danger" onClick={() => disconnect("supabase")}>Bağlantıyı Kes</ActionButton>
+              </>),
             })}
           </div>
         </div>
