@@ -42,80 +42,131 @@ const PRIORITY_SELECTED: Record<Priority, string> = {
   Kritik: "bg-red-500 border-red-400 text-white shadow-sm",
 };
 
-type PrimaryProjectContextKey =
+type ConnectionKey =
   | "githubRepoUrl"
   | "localProjectPath"
   | "liveUrl"
   | "vercelProjectUrl"
   | "vpsHost"
-  | "supabaseProjectUrl"
-  | "notes";
+  | "supabaseProjectUrl";
 
-type WizardState = {
-  keyName: PrimaryProjectContextKey;
-  step: 1 | 2;
-  inputValue: string;
-};
+const CONNECTION_KEYS: ConnectionKey[] = [
+  "githubRepoUrl",
+  "localProjectPath",
+  "liveUrl",
+  "vercelProjectUrl",
+  "vpsHost",
+  "supabaseProjectUrl",
+];
 
 type WizardConfig = {
   title: string;
-  label: string;
-  placeholder: string;
-  inputType?: "text" | "url";
-  multiline?: boolean;
-  step2Label: string;
+  step1: {
+    heading: string;
+    instructions: string;
+    actionUrl?: string;
+    actionLabel?: string;
+  };
+  step2: {
+    heading: string;
+    label: string;
+    placeholder: string;
+    inputType?: "text" | "url";
+    multiline?: boolean;
+  };
 };
 
-const WIZARD_CONFIGS: Record<PrimaryProjectContextKey, WizardConfig> = {
+const WIZARD_CONFIGS: Record<ConnectionKey, WizardConfig> = {
   githubRepoUrl: {
     title: "GitHub Reposunu Bağla",
-    label: "GitHub Repo URL",
-    placeholder: "https://github.com/onursuay/coinbot",
-    inputType: "url",
-    step2Label: "Bağlantı önizlemesi",
+    step1: {
+      heading: "GitHub'a Git",
+      instructions: "Bağlamak istediğiniz reponun sayfasını açın ve adres çubuğundaki URL'yi kopyalayın.",
+      actionUrl: "https://github.com",
+      actionLabel: "GitHub'ı Aç →",
+    },
+    step2: {
+      heading: "Repo URL'ini Yapıştır",
+      label: "GitHub Repo URL",
+      placeholder: "https://github.com/onursuay/coinbot",
+      inputType: "url",
+    },
   },
   liveUrl: {
     title: "Canlı Site URL Ekle",
-    label: "Canlı Site URL",
-    placeholder: "https://coin.onursuay.com",
-    inputType: "url",
-    step2Label: "URL önizlemesi",
+    step1: {
+      heading: "Canlı Sitenizi Açın",
+      instructions: "Tarayıcınızda sitenizi açın ve adres çubuğundaki tam URL'yi kopyalayın.",
+    },
+    step2: {
+      heading: "URL'yi Yapıştır",
+      label: "Canlı Site URL",
+      placeholder: "https://coin.onursuay.com",
+      inputType: "url",
+    },
   },
   vercelProjectUrl: {
-    title: "Vercel URL Ekle",
-    label: "Vercel Project URL",
-    placeholder: "https://vercel.com/onur-suay/coinbot",
-    inputType: "url",
-    step2Label: "URL önizlemesi",
+    title: "Vercel Projesini Bağla",
+    step1: {
+      heading: "Vercel Dashboard'ını Aç",
+      instructions: "Vercel dashboard'ınızı açın, ilgili projeye tıklayın ve adres çubuğundaki URL'yi kopyalayın.",
+      actionUrl: "https://vercel.com/dashboard",
+      actionLabel: "Vercel'i Aç →",
+    },
+    step2: {
+      heading: "Project URL'ini Yapıştır",
+      label: "Vercel Project URL",
+      placeholder: "https://vercel.com/onur-suay/coinbot",
+      inputType: "url",
+    },
   },
   vpsHost: {
-    title: "VPS / Worker Bilgisi Ekle",
-    label: "VPS / Worker Bilgisi",
-    placeholder: "Hostinger VPS, Docker worker, /opt/coinbot",
-    inputType: "text",
-    step2Label: "Bilgi önizlemesi",
+    title: "VPS / Worker Bağla",
+    step1: {
+      heading: "VPS Bilgisini Hazırla",
+      instructions: "VPS IP adresi, hostname veya Docker container/worker bilginizi hazırlayın.\n\nÖrnek: root@72.62.146.159  —  ya da  —  Hostinger VPS, Docker /opt/coinbot",
+    },
+    step2: {
+      heading: "Bilgiyi Girin",
+      label: "VPS / Worker Bilgisi",
+      placeholder: "root@72.62.146.159 veya Hostinger VPS, /opt/coinbot",
+      inputType: "text",
+    },
   },
   localProjectPath: {
-    title: "Lokal Proje Yolu Ekle",
-    label: "Lokal Proje Yolu",
-    placeholder: "/Users/onursuay/Desktop/Onur Suay/Web Siteleri/coinbot",
-    inputType: "text",
-    step2Label: "Yol önizlemesi",
+    title: "Lokal Projeyi Bağla",
+    step1: {
+      heading: "Proje Yolunu Bul",
+      instructions: "Terminal'i açın, proje klasörüne gidin ve aşağıdaki komutu çalıştırın:\n\npwd\n\nÇıkan tam yolu kopyalayın.",
+    },
+    step2: {
+      heading: "Yolu Yapıştır",
+      label: "Lokal Proje Yolu",
+      placeholder: "/Users/onursuay/Desktop/Onur Suay/Web Siteleri/coinbot",
+      inputType: "text",
+    },
   },
   supabaseProjectUrl: {
-    title: "Supabase URL Ekle",
-    label: "Supabase Project URL",
-    placeholder: "https://supabase.com/dashboard/project/...",
-    inputType: "url",
-    step2Label: "URL önizlemesi",
+    title: "Supabase Projesini Bağla",
+    step1: {
+      heading: "Supabase Dashboard'ını Aç",
+      instructions: "Supabase dashboard'ınızı açın, ilgili projeye tıklayın ve adres çubuğundaki URL'yi kopyalayın.",
+      actionUrl: "https://supabase.com/dashboard",
+      actionLabel: "Supabase'i Aç →",
+    },
+    step2: {
+      heading: "Project URL'ini Yapıştır",
+      label: "Supabase Project URL",
+      placeholder: "https://supabase.com/dashboard/project/...",
+      inputType: "url",
+    },
   },
-  notes: {
-    title: "Ek Not Ekle",
-    label: "Ek Not",
-    placeholder: "Branch adı, deployment ortamı, kritik kısıtlar veya AI'a iletilmesi gereken diğer bağlam bilgisi...",
-    multiline: true,
-    step2Label: "Not önizlemesi",
-  },
+};
+
+type WizardState = {
+  keyName: ConnectionKey;
+  step: 1 | 2;
+  inputValue: string;
 };
 
 type PromptModalConfig = {
@@ -133,16 +184,6 @@ type ActionButtonProps = {
   disabled?: boolean;
   title?: string;
 };
-
-const PRIMARY_CONTEXT_KEYS: PrimaryProjectContextKey[] = [
-  "githubRepoUrl",
-  "localProjectPath",
-  "liveUrl",
-  "vercelProjectUrl",
-  "vpsHost",
-  "supabaseProjectUrl",
-  "notes",
-];
 
 const BADGE_TONES: Record<BadgeTone, string> = {
   neutral: "border-slate-500/50 bg-slate-700/55 text-slate-300",
@@ -235,7 +276,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
   const sanitizedContext = (): ProjectContext | undefined => {
     const trimmed: ProjectContext = {};
-    PRIMARY_CONTEXT_KEYS.forEach((key) => {
+    CONNECTION_KEYS.forEach((key) => {
       const value = projectContext[key]?.trim();
       if (value) trimmed[key] = value;
     });
@@ -260,9 +301,9 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     return Object.keys(trimmed).length ? trimmed : undefined;
   };
 
-  const hasAnyContext = PRIMARY_CONTEXT_KEYS.some((key) => !!projectContext[key]?.trim());
+  const hasAnyContext = CONNECTION_KEYS.some((key) => !!projectContext[key]?.trim());
 
-  const applyContextValue = (key: PrimaryProjectContextKey, rawValue: string) => {
+  const applyContextValue = (key: ConnectionKey, rawValue: string) => {
     const value = rawValue.trim();
     const updatedAt = new Date().toISOString();
 
@@ -312,12 +353,8 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     });
   };
 
-  const openWizard = (keyName: PrimaryProjectContextKey) => {
-    setWizard({
-      keyName,
-      step: 1,
-      inputValue: projectContext[keyName] ?? "",
-    });
+  const openWizard = (keyName: ConnectionKey) => {
+    setWizard({ keyName, step: 1, inputValue: projectContext[keyName] ?? "" });
   };
 
   const wizardNext = () => {
@@ -431,6 +468,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
+  // Derived connection states
   const githubRepoUrl = projectContext.githubRepoUrl?.trim() ?? "";
   const githubRepoFullName = projectContext.githubRepoFullName?.trim() || parseGithubFullName(githubRepoUrl);
   const githubStatus = !githubRepoUrl ? "Bağlı değil" : githubRepoFullName ? "Bağlı" : "Hata";
@@ -438,26 +476,13 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
   const liveUrl = projectContext.liveUrl?.trim() ?? "";
   const liveUrlStatus = projectContext.liveUrlStatus ?? "not_checked";
-  const liveStatus = !liveUrl
-    ? "Bağlı değil"
-    : liveUrlStatus === "valid"
-      ? "Doğrulandı"
-      : liveUrlStatus === "invalid"
-        ? "Erişilemiyor"
-        : "Eklendi";
-  const liveStatusTone: BadgeTone = !liveUrl
-    ? "neutral"
-    : liveUrlStatus === "valid"
-      ? "success"
-      : liveUrlStatus === "invalid"
-        ? "danger"
-        : "info";
+  const liveStatus = !liveUrl ? "Bağlı değil" : liveUrlStatus === "valid" ? "Doğrulandı" : liveUrlStatus === "invalid" ? "Erişilemiyor" : "Eklendi";
+  const liveStatusTone: BadgeTone = !liveUrl ? "neutral" : liveUrlStatus === "valid" ? "success" : liveUrlStatus === "invalid" ? "danger" : "info";
 
   const vercelUrl = projectContext.vercelProjectUrl?.trim() ?? "";
   const vpsHost = projectContext.vpsHost?.trim() ?? "";
   const localProjectPath = projectContext.localProjectPath?.trim() ?? "";
   const supabaseUrl = projectContext.supabaseProjectUrl?.trim() ?? "";
-  const notes = projectContext.notes?.trim() ?? "";
 
   const repoNoticeItems = [
     repoRequired && !hasAnyContext
@@ -532,7 +557,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     onSubmit(request);
   };
 
-  // Wizard step 2 preview content
+  // Wizard step 2 preview
   const renderWizardStep2Preview = () => {
     if (!wizard) return null;
     const { keyName, inputValue } = wizard;
@@ -541,15 +566,16 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     if (keyName === "githubRepoUrl") {
       const parsed = parseGithubFullName(trimmed);
       return parsed ? (
-        <div className="rounded-lg border border-emerald-300/25 bg-emerald-400/10 p-3">
-          <p className="text-xs text-slate-400 mb-1">Tespit edilen repo</p>
+        <div className="rounded-lg border border-emerald-300/25 bg-emerald-400/10 p-4">
+          <p className="text-xs text-slate-400 mb-1.5">Tespit edilen repo</p>
           <p className="text-sm font-semibold text-emerald-100">{parsed}</p>
-          <p className="text-xs text-slate-500 mt-1 truncate">{trimmed}</p>
+          <p className="mt-1 text-xs text-slate-500 truncate">{trimmed}</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 p-3">
-          <p className="text-xs text-amber-200 font-medium">GitHub URL formatı çözümlenemedi</p>
-          <p className="text-xs text-slate-400 mt-1">Ham URL analiz bağlamına eklenecek: <span className="text-slate-200">{trimmed}</span></p>
+        <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 p-4">
+          <p className="text-xs font-semibold text-amber-200 mb-1">GitHub URL formatı çözümlenemedi</p>
+          <p className="text-xs text-slate-400">Ham URL analiz bağlamına eklenecek:</p>
+          <p className="mt-1 text-xs text-slate-200 break-all">{trimmed}</p>
         </div>
       );
     }
@@ -557,27 +583,18 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     if (keyName === "liveUrl") {
       const valid = isHttpUrl(trimmed);
       return (
-        <div className={`rounded-lg border p-3 ${valid ? "border-emerald-300/25 bg-emerald-400/10" : "border-amber-300/25 bg-amber-400/10"}`}>
-          <p className="text-xs text-slate-400 mb-1">URL</p>
+        <div className={`rounded-lg border p-4 ${valid ? "border-emerald-300/25 bg-emerald-400/10" : "border-amber-300/25 bg-amber-400/10"}`}>
+          <p className="text-xs text-slate-400 mb-1.5">Eklenecek URL</p>
           <p className="text-sm text-slate-100 break-all">{trimmed}</p>
-          {!valid && <p className="text-xs text-amber-200 mt-1.5">HTTP/HTTPS URL formatı bekleniyor.</p>}
-        </div>
-      );
-    }
-
-    if (keyName === "notes") {
-      return (
-        <div className="rounded-lg border border-slate-500/35 bg-slate-950/20 p-3">
-          <p className="text-xs text-slate-400 mb-1">Not önizlemesi</p>
-          <p className="text-sm text-slate-200 leading-5 whitespace-pre-wrap line-clamp-5">{trimmed}</p>
+          {!valid && <p className="mt-2 text-xs text-amber-200">HTTP/HTTPS URL formatı bekleniyor.</p>}
         </div>
       );
     }
 
     return (
-      <div className="rounded-lg border border-slate-500/35 bg-slate-950/20 p-3">
-        <p className="text-xs text-slate-400 mb-1">Kaydedilecek değer</p>
-        <p className="text-sm text-slate-100 break-all">{trimmed}</p>
+      <div className="rounded-lg border border-slate-500/35 bg-slate-950/20 p-4">
+        <p className="text-xs text-slate-400 mb-1.5">Kaydedilecek değer</p>
+        <p className="text-sm text-slate-100 break-all whitespace-pre-wrap">{trimmed}</p>
       </div>
     );
   };
@@ -587,9 +604,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Proje Adı */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">
-          Proje Adı
-        </label>
+        <label className="block text-sm font-medium text-slate-300 mb-1.5">Proje Adı</label>
         <input
           type="text"
           value={projectName}
@@ -601,9 +616,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
       {/* Talep Tipi */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Talep Tipi
-        </label>
+        <label className="block text-sm font-medium text-slate-300 mb-2">Talep Tipi</label>
         <div className="flex flex-wrap gap-2">
           {REQUEST_TYPES.map((type) => (
             <button
@@ -624,9 +637,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
       {/* Öncelik */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Öncelik
-        </label>
+        <label className="block text-sm font-medium text-slate-300 mb-2">Öncelik</label>
         <div className="flex gap-2">
           {PRIORITIES.map((p) => (
             <button
@@ -634,9 +645,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
               type="button"
               onClick={() => setPriority(p)}
               className={`px-4 py-2 rounded-lg text-sm border font-medium transition cursor-pointer ${
-                priority === p
-                  ? PRIORITY_SELECTED[p]
-                  : PRIORITY_COLORS[p]
+                priority === p ? PRIORITY_SELECTED[p] : PRIORITY_COLORS[p]
               }`}
             >
               {p}
@@ -647,9 +656,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
 
       {/* Prompt */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">
-          Prompt
-        </label>
+        <label className="block text-sm font-medium text-slate-300 mb-1.5">Prompt</label>
         <textarea
           value={problem}
           onChange={(e) => {
@@ -672,13 +679,9 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         <p className="text-xs text-slate-500 mb-3">
           Sorunu anlatan ekran görüntüsü, PDF, doküman veya görselleri ekleyin. AI analiz sırasında referans olarak kullanılır.
         </p>
-
         <div
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            handleFiles(Array.from(e.dataTransfer.files));
-          }}
+          onDrop={(e) => { e.preventDefault(); handleFiles(Array.from(e.dataTransfer.files)); }}
           onClick={() => fileInputRef.current?.click()}
           className="border-2 border-dashed border-slate-500/60 rounded-xl p-6 text-center cursor-pointer bg-[#202b40]/70 hover:border-emerald-300/45 hover:bg-emerald-400/10 transition"
         >
@@ -693,7 +696,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             onChange={(e) => handleFiles(Array.from(e.target.files ?? []))}
           />
         </div>
-
         {attachments.length > 0 && (
           <ul className="mt-3 space-y-2">
             {attachments.map((att) => (
@@ -713,11 +715,9 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         )}
       </div>
 
-      {/* Beklenen Çıktı — otomatik */}
+      {/* Beklenen Çıktı */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">
-          Beklenen Çıktı
-        </label>
+        <label className="block text-sm font-medium text-slate-300 mb-1.5">Beklenen Çıktı</label>
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-500/45 bg-slate-700/45 text-sm text-slate-300 select-none">
           <span className="text-slate-500 text-xs">Otomatik:</span>
           <span className="font-medium text-emerald-100">{OUTPUT_BY_TYPE[requestType]}</span>
@@ -748,7 +748,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         </span>
       </div>
 
-      {/* Proje Bağlantıları — yalnızca repo toggle açıkken görünür */}
+      {/* Proje Bağlantıları */}
       {repoRequired && (
         <div className="space-y-4 rounded-lg border border-slate-500/45 bg-slate-700/30 p-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -763,10 +763,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           {repoNoticeItems.length > 0 && (
             <div className="space-y-2">
               {repoNoticeItems.map((notice) => (
-                <div
-                  key={notice}
-                  className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
-                >
+                <div key={notice} className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
                   {notice}
                 </div>
               ))}
@@ -779,28 +776,15 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
               title: "GitHub",
               status: githubStatus,
               statusTone: githubStatusTone,
-              value: githubRepoUrl
-                ? githubRepoFullName
-                  ? githubRepoFullName
-                  : githubRepoUrl
-                : "Bağlantı yok",
+              value: githubRepoUrl ? (githubRepoFullName ?? githubRepoUrl) : "Bağlantı yok",
               actions: (
                 <>
                   {!githubRepoUrl ? (
-                    <ActionButton variant="primary" onClick={() => openWizard("githubRepoUrl")}>
-                      Bağlan
-                    </ActionButton>
+                    <ActionButton variant="primary" onClick={() => openWizard("githubRepoUrl")}>Bağlan</ActionButton>
                   ) : (
                     <>
-                      <ActionButton onClick={() => openWizard("githubRepoUrl")}>
-                        Değiştir
-                      </ActionButton>
-                      <ActionButton
-                        variant="danger"
-                        onClick={() => clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}
-                      >
-                        Kes
-                      </ActionButton>
+                      <ActionButton onClick={() => openWizard("githubRepoUrl")}>Değiştir</ActionButton>
+                      <ActionButton variant="danger" onClick={() => clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}>Kes</ActionButton>
                     </>
                   )}
                 </>
@@ -816,20 +800,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
               actions: (
                 <>
                   {!liveUrl ? (
-                    <ActionButton variant="primary" onClick={() => openWizard("liveUrl")}>
-                      Bağlan
-                    </ActionButton>
+                    <ActionButton variant="primary" onClick={() => openWizard("liveUrl")}>Bağlan</ActionButton>
                   ) : (
                     <>
-                      <ActionButton variant="ghost" onClick={validateLiveUrl}>
-                        Doğrula
-                      </ActionButton>
-                      <ActionButton onClick={() => openWizard("liveUrl")}>
-                        Değiştir
-                      </ActionButton>
-                      <ActionButton variant="danger" onClick={() => clearContextKeys(["liveUrl", "liveUrlStatus"])}>
-                        Kes
-                      </ActionButton>
+                      <ActionButton variant="ghost" onClick={validateLiveUrl}>Doğrula</ActionButton>
+                      <ActionButton onClick={() => openWizard("liveUrl")}>Değiştir</ActionButton>
+                      <ActionButton variant="danger" onClick={() => clearContextKeys(["liveUrl", "liveUrlStatus"])}>Kes</ActionButton>
                     </>
                   )}
                 </>
@@ -839,23 +815,17 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderConnectionCard({
               icon: "VC",
               title: "Vercel",
-              status: vercelUrl ? "Eklendi" : "Bağlantı yok",
+              status: vercelUrl ? "Bağlı" : "Bağlantı yok",
               statusTone: vercelUrl ? "info" : "neutral",
               value: vercelUrl || "Bağlantı yok",
               actions: (
                 <>
                   {!vercelUrl ? (
-                    <ActionButton variant="primary" onClick={() => openWizard("vercelProjectUrl")}>
-                      Bağlan
-                    </ActionButton>
+                    <ActionButton variant="primary" onClick={() => openWizard("vercelProjectUrl")}>Bağlan</ActionButton>
                   ) : (
                     <>
-                      <ActionButton onClick={() => openWizard("vercelProjectUrl")}>
-                        Değiştir
-                      </ActionButton>
-                      <ActionButton variant="danger" onClick={() => clearContextKeys(["vercelProjectUrl"])}>
-                        Kes
-                      </ActionButton>
+                      <ActionButton onClick={() => openWizard("vercelProjectUrl")}>Değiştir</ActionButton>
+                      <ActionButton variant="danger" onClick={() => clearContextKeys(["vercelProjectUrl"])}>Kes</ActionButton>
                     </>
                   )}
                 </>
@@ -865,26 +835,18 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderConnectionCard({
               icon: "VPS",
               title: "VPS / Worker",
-              status: vpsHost ? "Eklendi" : "Bağlantı yok",
+              status: vpsHost ? "Bağlı" : "Bağlantı yok",
               statusTone: vpsHost ? "success" : "neutral",
               value: vpsHost || "Bağlantı yok",
               actions: (
                 <>
                   {!vpsHost ? (
-                    <ActionButton variant="primary" onClick={() => openWizard("vpsHost")}>
-                      Bağlan
-                    </ActionButton>
+                    <ActionButton variant="primary" onClick={() => openWizard("vpsHost")}>Bağlan</ActionButton>
                   ) : (
                     <>
-                      <ActionButton variant="ghost" onClick={showVpsPrompt}>
-                        SSH Talimatı
-                      </ActionButton>
-                      <ActionButton onClick={() => openWizard("vpsHost")}>
-                        Değiştir
-                      </ActionButton>
-                      <ActionButton variant="danger" onClick={() => clearContextKeys(["vpsHost"])}>
-                        Kes
-                      </ActionButton>
+                      <ActionButton variant="ghost" onClick={showVpsPrompt}>SSH Talimatı</ActionButton>
+                      <ActionButton onClick={() => openWizard("vpsHost")}>Değiştir</ActionButton>
+                      <ActionButton variant="danger" onClick={() => clearContextKeys(["vpsHost"])}>Kes</ActionButton>
                     </>
                   )}
                 </>
@@ -894,26 +856,18 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderConnectionCard({
               icon: "LP",
               title: "Lokal Proje",
-              status: localProjectPath ? "Eklendi" : "Bağlantı yok",
+              status: localProjectPath ? "Bağlı" : "Bağlantı yok",
               statusTone: localProjectPath ? "success" : "neutral",
               value: localProjectPath || "Bağlantı yok",
               actions: (
                 <>
                   {!localProjectPath ? (
-                    <ActionButton variant="primary" onClick={() => openWizard("localProjectPath")}>
-                      Bağlan
-                    </ActionButton>
+                    <ActionButton variant="primary" onClick={() => openWizard("localProjectPath")}>Bağlan</ActionButton>
                   ) : (
                     <>
-                      <ActionButton variant="ghost" onClick={showLocalPrompt}>
-                        Claude Code ile Aç
-                      </ActionButton>
-                      <ActionButton onClick={() => openWizard("localProjectPath")}>
-                        Değiştir
-                      </ActionButton>
-                      <ActionButton variant="danger" onClick={() => clearContextKeys(["localProjectPath"])}>
-                        Kes
-                      </ActionButton>
+                      <ActionButton variant="ghost" onClick={showLocalPrompt}>Claude Code ile Aç</ActionButton>
+                      <ActionButton onClick={() => openWizard("localProjectPath")}>Değiştir</ActionButton>
+                      <ActionButton variant="danger" onClick={() => clearContextKeys(["localProjectPath"])}>Kes</ActionButton>
                     </>
                   )}
                 </>
@@ -923,139 +877,23 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {renderConnectionCard({
               icon: "SB",
               title: "Supabase",
-              status: supabaseUrl ? "Eklendi" : "Bağlantı yok",
+              status: supabaseUrl ? "Bağlı" : "Bağlantı yok",
               statusTone: supabaseUrl ? "info" : "neutral",
               value: supabaseUrl || "Bağlantı yok",
               actions: (
                 <>
                   {!supabaseUrl ? (
-                    <ActionButton variant="primary" onClick={() => openWizard("supabaseProjectUrl")}>
-                      Bağlan
-                    </ActionButton>
+                    <ActionButton variant="primary" onClick={() => openWizard("supabaseProjectUrl")}>Bağlan</ActionButton>
                   ) : (
                     <>
-                      <ActionButton onClick={() => openWizard("supabaseProjectUrl")}>
-                        Değiştir
-                      </ActionButton>
-                      <ActionButton variant="danger" onClick={() => clearContextKeys(["supabaseProjectUrl"])}>
-                        Kes
-                      </ActionButton>
-                    </>
-                  )}
-                </>
-              ),
-            })}
-
-            {renderConnectionCard({
-              icon: "NOT",
-              title: "Ek Not",
-              status: notes ? "Eklendi" : "Not yok",
-              statusTone: notes ? "info" : "neutral",
-              value: notes ? notes.slice(0, 60) + (notes.length > 60 ? "…" : "") : "Bağlantı yok",
-              actions: (
-                <>
-                  {!notes ? (
-                    <ActionButton variant="primary" onClick={() => openWizard("notes")}>
-                      Bağlan
-                    </ActionButton>
-                  ) : (
-                    <>
-                      <ActionButton onClick={() => openWizard("notes")}>
-                        Değiştir
-                      </ActionButton>
-                      <ActionButton variant="danger" onClick={() => clearContextKeys(["notes"])}>
-                        Kes
-                      </ActionButton>
+                      <ActionButton onClick={() => openWizard("supabaseProjectUrl")}>Değiştir</ActionButton>
+                      <ActionButton variant="danger" onClick={() => clearContextKeys(["supabaseProjectUrl"])}>Kes</ActionButton>
                     </>
                   )}
                 </>
               ),
             })}
           </div>
-
-          <details className="rounded-lg border border-slate-500/35 bg-slate-950/15 p-3">
-            <summary className="cursor-pointer select-none text-xs font-semibold text-slate-300">
-              Gelişmiş manuel düzenleme
-            </summary>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">GitHub Repo URL</label>
-                <input
-                  type="url"
-                  value={projectContext.githubRepoUrl ?? ""}
-                  onChange={(e) => updateContext("githubRepoUrl", e.target.value)}
-                  placeholder="https://github.com/onursuay/coinbot"
-                  className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Lokal Proje Yolu</label>
-                <input
-                  type="text"
-                  value={projectContext.localProjectPath ?? ""}
-                  onChange={(e) => updateContext("localProjectPath", e.target.value)}
-                  placeholder="/Users/onursuay/Desktop/Onur Suay/Web Siteleri/coinbot"
-                  className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Canlı Site URL</label>
-                <input
-                  type="url"
-                  value={projectContext.liveUrl ?? ""}
-                  onChange={(e) => updateContext("liveUrl", e.target.value)}
-                  placeholder="https://coin.onursuay.com"
-                  className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Vercel Project URL</label>
-                <input
-                  type="url"
-                  value={projectContext.vercelProjectUrl ?? ""}
-                  onChange={(e) => updateContext("vercelProjectUrl", e.target.value)}
-                  placeholder="https://vercel.com/onur-suay/coinbot"
-                  className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">VPS / Worker Bilgisi</label>
-                <input
-                  type="text"
-                  value={projectContext.vpsHost ?? ""}
-                  onChange={(e) => updateContext("vpsHost", e.target.value)}
-                  placeholder="Hostinger VPS, Docker worker, /opt/coinbot"
-                  className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Supabase Project URL</label>
-                <input
-                  type="url"
-                  value={projectContext.supabaseProjectUrl ?? ""}
-                  onChange={(e) => updateContext("supabaseProjectUrl", e.target.value)}
-                  placeholder="https://supabase.com/dashboard/project/..."
-                  className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-slate-400 mb-1">Ek Not</label>
-                <textarea
-                  value={projectContext.notes ?? ""}
-                  onChange={(e) => updateContext("notes", e.target.value)}
-                  placeholder="Branch adı, deployment ortamı, kritik kısıtlar veya AI'a iletilmesi gereken diğer bağlam bilgisi..."
-                  rows={2}
-                  className="w-full resize-none rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                />
-              </div>
-            </div>
-          </details>
         </div>
       )}
 
@@ -1083,47 +921,41 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     {wizard && (() => {
       const config = WIZARD_CONFIGS[wizard.keyName];
       const canProceed = wizard.inputValue.trim().length > 0;
+      const stepConfig = wizard.step === 1 ? config.step1 : config.step2;
+
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4">
           <div className="w-full max-w-lg rounded-xl border border-slate-500/45 bg-[#172033] p-5 shadow-2xl">
+
             {/* Header */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
                 <h3 className="text-base font-semibold text-slate-100">{config.title}</h3>
-                <div className="flex items-center gap-1.5">
-                  <span className={`h-2 w-2 rounded-full ${wizard.step === 1 ? "bg-emerald-400" : "bg-slate-600"}`} />
-                  <span className={`h-2 w-2 rounded-full ${wizard.step === 2 ? "bg-emerald-400" : "bg-slate-600"}`} />
-                </div>
+                <p className="mt-0.5 text-xs text-slate-500">{stepConfig.heading}</p>
               </div>
-              <p className="text-xs text-slate-500">
-                {wizard.step === 1 ? config.label : config.step2Label}
-              </p>
+              <div className="flex items-center gap-1.5 pt-1">
+                <span className={`h-2 w-2 rounded-full transition-colors ${wizard.step === 1 ? "bg-emerald-400" : "bg-slate-600"}`} />
+                <span className={`h-2 w-2 rounded-full transition-colors ${wizard.step === 2 ? "bg-emerald-400" : "bg-slate-600"}`} />
+              </div>
             </div>
 
-            {/* Step 1: Input */}
+            {/* Step 1: Navigate to source */}
             {wizard.step === 1 && (
               <>
-                {config.multiline ? (
-                  <textarea
-                    autoFocus
-                    value={wizard.inputValue}
-                    onChange={(e) => setWizard((prev) => prev ? { ...prev, inputValue: e.target.value } : prev)}
-                    placeholder={config.placeholder}
-                    rows={5}
-                    className="w-full resize-none rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                  />
-                ) : (
-                  <input
-                    autoFocus
-                    type={config.inputType ?? "text"}
-                    value={wizard.inputValue}
-                    onChange={(e) => setWizard((prev) => prev ? { ...prev, inputValue: e.target.value } : prev)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && canProceed) wizardNext(); }}
-                    placeholder={config.placeholder}
-                    className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
-                  />
+                {config.step1.actionUrl && (
+                  <a
+                    href={config.step1.actionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-300/70 hover:bg-emerald-400/15"
+                  >
+                    {config.step1.actionLabel}
+                  </a>
                 )}
-                <div className="mt-5 flex justify-end gap-2">
+                <div className="mb-5 rounded-lg border border-slate-500/35 bg-slate-950/20 px-4 py-3">
+                  <p className="text-xs leading-5 text-slate-400 whitespace-pre-line">{config.step1.instructions}</p>
+                </div>
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setWizard(null)}
@@ -1134,20 +966,46 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                   <button
                     type="button"
                     onClick={wizardNext}
-                    disabled={!canProceed}
-                    className="rounded-lg border border-emerald-300/70 bg-emerald-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:opacity-45 disabled:cursor-not-allowed"
+                    className="rounded-lg border border-emerald-300/70 bg-emerald-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200"
                   >
-                    İleri →
+                    Devam Et →
                   </button>
                 </div>
               </>
             )}
 
-            {/* Step 2: Preview & Confirm */}
+            {/* Step 2: Paste / enter value */}
             {wizard.step === 2 && (
               <>
-                {renderWizardStep2Preview()}
-                <div className="mt-5 flex justify-end gap-2">
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">{config.step2.label}</label>
+                  {config.step2.multiline ? (
+                    <textarea
+                      autoFocus
+                      value={wizard.inputValue}
+                      onChange={(e) => setWizard((prev) => prev ? { ...prev, inputValue: e.target.value } : prev)}
+                      placeholder={config.step2.placeholder}
+                      rows={5}
+                      className="w-full resize-none rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+                    />
+                  ) : (
+                    <input
+                      autoFocus
+                      type={config.step2.inputType ?? "text"}
+                      value={wizard.inputValue}
+                      onChange={(e) => setWizard((prev) => prev ? { ...prev, inputValue: e.target.value } : prev)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && canProceed) wizardSave(); }}
+                      placeholder={config.step2.placeholder}
+                      className="w-full rounded-lg border border-slate-500/55 bg-[#202b40] px-3 py-2 text-sm text-slate-100 placeholder-slate-500 transition focus:border-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+                    />
+                  )}
+                </div>
+
+                {wizard.inputValue.trim() && (
+                  <div className="mb-4">{renderWizardStep2Preview()}</div>
+                )}
+
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={wizardBack}
@@ -1158,7 +1016,8 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                   <button
                     type="button"
                     onClick={wizardSave}
-                    className="rounded-lg border border-emerald-300/70 bg-emerald-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200"
+                    disabled={!canProceed}
+                    className="rounded-lg border border-emerald-300/70 bg-emerald-300 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:opacity-45 disabled:cursor-not-allowed"
                   >
                     Kaydet
                   </button>
@@ -1170,6 +1029,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       );
     })()}
 
+    {/* Prompt Modal (VPS / Local) */}
     {promptModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4">
         <div className="w-full max-w-2xl rounded-xl border border-slate-500/45 bg-[#172033] p-5 shadow-2xl">
