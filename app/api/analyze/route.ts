@@ -58,7 +58,7 @@ function buildProjectContextBlock(req: DecisionRequest): string {
 
   // Repo analizi istendi ama bağlam verilmedi → AI'a açıkça uyarı.
   if (req.repoRequired && !hasContext) {
-    return `\n\nPROJE BAĞLAMI:\nRepo analizi istendi ancak GitHub repo URL'i veya lokal proje yolu sağlanmadı. Kod erişimi doğrulanmadan kesin kod analizi yapma; yalnızca yazılı problem tanımı ve eklenen referans dosyalar üzerinden çalış.`;
+    return `\n\nPROJE BAĞLAMI:\nKod analizi istendi ancak proje bağlantısı eklenmedi. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder.`;
   }
 
   if (!hasContext) return "";

@@ -176,7 +176,7 @@ function buildProjectContextSection(req: DecisionRequest): string {
   );
 
   if (req.repoRequired && !hasContext) {
-    return `\n\n## Proje Bağlamı\n_Repo analizi istendi ancak GitHub repo URL'i veya lokal proje yolu sağlanmadı. Kod erişimi doğrulanmadan kesin kod analizi yapma._`;
+    return `\n\n## Proje Bağlamı\n_Kod analizi istendi ancak proje bağlantısı eklenmedi. AI yalnızca yazılı açıklama ve ek dosyaları analiz eder._`;
   }
 
   if (!hasContext) return "";

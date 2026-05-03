@@ -97,6 +97,10 @@ export interface ProjectContext {
   vpsHost?: string;
   supabaseProjectUrl?: string;
   notes?: string;
+  githubConnectionStatus?: "manual" | "connected" | "not_connected";
+  githubRepoFullName?: string;
+  liveUrlStatus?: "not_checked" | "valid" | "invalid";
+  projectConnectionsUpdatedAt?: string;
 }
 
 export interface DecisionRequest {
