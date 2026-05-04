@@ -405,6 +405,17 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   // Read all OAuth callback params on mount + restore from localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Popup guard: Vercel bazen /?vercel_connected=1 sayfasını doğrudan popup
+    // içinde açar (callback bridge'ini atlayarak). Eğer opener varsa opener'ı
+    // bu URL'ye yönlendir ve popup'ı kapat.
+    const hasVercelParam = params.get("vercel_connected") === "1" || !!params.get("vercel_error");
+    if (hasVercelParam && window.opener && !window.opener.closed) {
+      try { window.opener.location.href = window.location.href; } catch (_) {}
+      setTimeout(() => { try { window.close(); } catch (_) {} }, 150);
+      // Devam: close() başarısızsa toast + state güncellemeye devam edilsin.
+    }
+
     let stored: OAuthConnections = {};
     try { const s = localStorage.getItem("verdict_oauth"); if (s) stored = JSON.parse(s); } catch {}
 
