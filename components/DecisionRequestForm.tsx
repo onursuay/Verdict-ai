@@ -507,6 +507,21 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         return next;
       });
     }
+    // Vercel popup'ından gelen postMessage fallback'i (opener.location yazmasının
+    // cross-origin engellendiği nadir durum için). Sadece kendi origin'imizden gelen
+    // verdict-vercel-connected mesajına güvenip ana sayfaya yönlendiriyoruz.
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as { type?: string; target?: string } | undefined;
+      if (!data || data.type !== "verdict-vercel-connected" || typeof data.target !== "string") return;
+      try {
+        const u = new URL(data.target, window.location.origin);
+        if (u.origin !== window.location.origin) return; // open redirect koruması
+        window.location.href = u.toString();
+      } catch {}
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
   const disconnect = async (service: keyof OAuthConnections) => {
@@ -1084,7 +1099,12 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                             </button>
                           </>
                         ) : (
-                          <ConnectButton onClick={() => { window.location.href = "/api/auth/vercel"; }}>Vercel Bağla</ConnectButton>
+                          <ConnectButton onClick={() => {
+                            // Popup tercih edilir: callback HTML bridge'i opener'ı yönlendirip popup'ı kapatır.
+                            // Pop-up engellenirse aynı pencerede yönlendir.
+                            const popup = window.open("/api/auth/vercel", "verdict-vercel-oauth", "width=920,height=720,resizable=yes,scrollbars=yes");
+                            if (!popup) window.location.href = "/api/auth/vercel";
+                          }}>Vercel Bağla</ConnectButton>
                         )}
                       </>
                     )}
