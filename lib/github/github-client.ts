@@ -3,13 +3,17 @@
 //
 // Sadece okuma yapar; yazma/PR/işlem yetkisi gerektirmez.
 
+import { AUDIT_LIMITS } from "../audit/limits";
+
 const GITHUB_API = "https://api.github.com";
 const USER_AGENT = "verdict-ai/1.0";
 
-export const FILE_TREE_LIMIT = 300;
-export const FILES_TO_READ_LIMIT = 25;
-export const FILE_CONTENT_CHAR_LIMIT = 20_000;
-export const TOTAL_CONTEXT_CHAR_LIMIT = 80_000;
+// Env-driven limitler. Eski hard-code 300/25/20K/80K değerleri ARTIK YOK.
+// Default'lar: 5000 entry tree, 80 dosya, 40K char/file, 200K char/audit.
+export const FILE_TREE_LIMIT = AUDIT_LIMITS.githubTreeMaxEntries;
+export const FILES_TO_READ_LIMIT = AUDIT_LIMITS.githubFilesToRead;
+export const FILE_CONTENT_CHAR_LIMIT = AUDIT_LIMITS.githubFileChars;
+export const TOTAL_CONTEXT_CHAR_LIMIT = AUDIT_LIMITS.contextPackChars;
 
 // Binary / asset uzantıları — okumayı reddet.
 const BINARY_EXTS = new Set([
@@ -144,32 +148,87 @@ export interface RepoTreeResult {
   entries: RepoTreeEntry[];
   truncated: boolean;
   warnings: string[];
+  // Branch HEAD commit SHA — Vercel production deploy commit ile eşleştirme için.
+  headSha?: string;
+}
+
+// Branch HEAD commit SHA'sını çeker. Hata durumunda undefined döner; ana akışı
+// kırmaz. Vercel productionCommitMatchesGithub karşılaştırması için kullanılır.
+export async function getBranchHeadSha(owner: string, repo: string, branch: string): Promise<string | undefined> {
+  const url = `${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${encodeURIComponent(branch)}`;
+  try {
+    const res = await ghFetch(url);
+    if (!res.ok) return undefined;
+    const data = await res.json() as { commit?: { sha?: string } };
+    return data.commit?.sha;
+  } catch { return undefined; }
+}
+
+// GitHub trees endpoint, tek istekte 100K SHA üst sınırına ulaşırsa
+// truncated:true döner. Bu durumda her üst-seviye dizini ayrı tree çağrısıyla
+// dolaşıp eksikleri doldururuz. Bu "pagination" görevini görür.
+async function fetchSingleTree(owner: string, repo: string, ref: string, recursive: boolean): Promise<{ entries: RepoTreeEntry[]; truncated: boolean } | null> {
+  const url = `${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(ref)}${recursive ? "?recursive=1" : ""}`;
+  const res = await ghFetch(url);
+  if (!res.ok) return null;
+  const data = await res.json() as { tree?: Array<RepoTreeEntry & { sha: string }>; truncated?: boolean };
+  return {
+    entries: (data.tree ?? []).filter((e) => typeof e.path === "string"),
+    truncated: !!data.truncated,
+  };
 }
 
 export async function getRepoTree(args: GetRepoTreeArgs): Promise<RepoTreeResult> {
   const branch = args.branch ?? await getDefaultBranch(args.owner, args.repo);
   const url = `${GITHUB_API}/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
-  const res = await ghFetch(url);
+  // Tree fetch ve HEAD SHA fetch paralel; SHA ana akışı kırmaz.
+  const [res, headSha] = await Promise.all([
+    ghFetch(url),
+    getBranchHeadSha(args.owner, args.repo, branch),
+  ]);
   if (!res.ok) throw mapStatusToError(res.status, "Repo dosya ağacı alınamadı.");
-  const data = await res.json() as { tree?: RepoTreeEntry[]; truncated?: boolean };
-  let entries = (data.tree ?? []).filter((e) => e.type === "blob" && typeof e.path === "string");
+  const data = await res.json() as { tree?: Array<RepoTreeEntry & { sha: string }>; truncated?: boolean };
+  const allEntries: Array<RepoTreeEntry & { sha?: string }> = (data.tree ?? []).filter((e) => typeof e.path === "string");
+  const warnings: string[] = [];
+
+  // Truncated → top-level subtree'leri ayrı ayrı recursive çek.
+  if (data.truncated) {
+    warnings.push("Repo dosya ağacı GitHub tarafından kısaltılmış; üst-seviye dizinler ek çağrılarla dolduruluyor.");
+    const seenPaths = new Set(allEntries.map((e) => e.path));
+    const topDirs = allEntries.filter((e) => e.type === "tree" && !e.path.includes("/"));
+    for (const dir of topDirs) {
+      if (!dir.sha) continue;
+      const sub = await fetchSingleTree(args.owner, args.repo, dir.sha, true);
+      if (!sub) continue;
+      for (const child of sub.entries) {
+        const fullPath = `${dir.path}/${child.path}`;
+        if (seenPaths.has(fullPath)) continue;
+        seenPaths.add(fullPath);
+        allEntries.push({ ...child, path: fullPath });
+      }
+      if (sub.truncated) {
+        warnings.push(`Üst-seviye dizin "${dir.path}" hala truncated; daha derin dizinler dahil edilmemiş olabilir.`);
+      }
+    }
+  }
+
+  let entries = allEntries.filter((e) => e.type === "blob");
   if (args.path) {
     const prefix = args.path.replace(/^\/+/, "").replace(/\/+$/, "") + "/";
     entries = entries.filter((e) => e.path === args.path || e.path.startsWith(prefix));
   }
-  const warnings: string[] = [];
-  if (data.truncated) warnings.push("Repo dosya ağacı GitHub tarafından kısaltılmış (truncated).");
   if (entries.length > FILE_TREE_LIMIT) {
-    warnings.push(`Dosya ağacı ${entries.length} kayıt içeriyor; ilk ${FILE_TREE_LIMIT} ile sınırlandırıldı.`);
+    warnings.push(`Dosya ağacı ${entries.length} kayıt içeriyor; ilk ${FILE_TREE_LIMIT} ile sınırlandırıldı (env: VERDICT_GITHUB_TREE_LIMIT).`);
     entries = entries.slice(0, FILE_TREE_LIMIT);
   }
   return {
     owner: args.owner,
     repo: args.repo,
     branch,
-    entries,
+    entries: entries.map(({ path, type, size, sha }) => ({ path, type, size, sha })),
     truncated: !!data.truncated,
     warnings,
+    headSha,
   };
 }
 

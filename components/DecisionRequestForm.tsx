@@ -1,7 +1,38 @@
 "use client";
 
 import { useState, useRef, useEffect, type ReactNode } from "react";
-import { DecisionAttachment, DecisionRequest, ExpectedOutput, Priority, ProjectContext, RequestType } from "@/types/decision";
+import { AuditSourceSelectionDTO, DecisionAttachment, DecisionRequest, ExpectedOutput, Priority, ProjectContext, RequestType } from "@/types/decision";
+
+type AuditSourceKey = keyof AuditSourceSelectionDTO;
+const AUDIT_SOURCE_KEYS: AuditSourceKey[] = ["github", "supabase", "vercel", "local", "worker"];
+const AUDIT_SOURCE_LABEL: Record<AuditSourceKey, { code: string; title: string; subtitle: string }> = {
+  github: { code: "GH", title: "GitHub Repo", subtitle: "Kod ağacı + dosya içerikleri" },
+  supabase: { code: "SB", title: "Supabase", subtitle: "Schema, RLS, fn, storage metadata" },
+  vercel: { code: "VC", title: "Vercel", subtitle: "Deploy, env key isimleri (değer yok)" },
+  local: { code: "LP", title: "Lokal Proje Yolu", subtitle: "Push edilmemiş lokal dosyalar" },
+  worker: { code: "VPS", title: "VPS / Worker", subtitle: "Heartbeat ve runtime" },
+};
+const AUDIT_SOURCES_DRAFT_KEY = "verdictai:audit-sources:v1";
+
+function loadAuditSourcesDraft(): AuditSourceSelectionDTO | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AUDIT_SOURCES_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuditSourceSelectionDTO>;
+    return {
+      github: !!parsed.github,
+      supabase: !!parsed.supabase,
+      vercel: !!parsed.vercel,
+      local: !!parsed.local,
+      worker: !!parsed.worker,
+    };
+  } catch { return null; }
+}
+function saveAuditSourcesDraft(sel: AuditSourceSelectionDTO) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(AUDIT_SOURCES_DRAFT_KEY, JSON.stringify(sel)); } catch {}
+}
 
 interface DecisionRequestFormProps {
   onSubmit: (request: DecisionRequest) => void;
@@ -130,7 +161,7 @@ type OAuthConnections = {
   supabase?: OAuthConnection;
 };
 
-type EditableContextKey = Exclude<ConnectionKey, "githubRepoUrl"> | "notes";
+type EditableContextKey = Exclude<ConnectionKey, "githubRepoUrl">;
 
 type WizardConfig = {
   title: string;
@@ -169,13 +200,6 @@ const WIZARD_CONFIGS: Record<EditableContextKey, WizardConfig> = {
     inputLabel: "Proje URL",
     inputPlaceholder: "https://supabase.com/dashboard/project/...",
     inputType: "url",
-  },
-  notes: {
-    title: "Ek Not",
-    inputLabel: "Not",
-    inputPlaceholder: "Branch adı, deployment ortamı veya kritik bağlam...",
-    inputType: "text",
-    multiline: true,
   },
 };
 
@@ -314,6 +338,10 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const [repoRequired, setRepoRequired] = useState(false);
   const [attachments, setAttachments] = useState<DecisionAttachment[]>([]);
   const [projectContext, setProjectContext] = useState<ProjectContext>({});
+  const [auditSources, setAuditSources] = useState<AuditSourceSelectionDTO>({
+    github: false, supabase: false, vercel: false, local: false, worker: false,
+  });
+  const [userTouchedAuditSources, setUserTouchedAuditSources] = useState(false);
   const [oauthConnections, setOauthConnections] = useState<OAuthConnections>({});
   const [wizard, setWizard] = useState<WizardState | null>(null);
   const [promptModal, setPromptModal] = useState<PromptModalConfig | null>(null);
@@ -323,6 +351,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [vercelToast, setVercelToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [formWarning, setFormWarning] = useState<string | null>(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
 
@@ -332,6 +361,11 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       setRepoRequired(draft.repoRequired);
       setProjectContext(draft.projectContext);
     }
+    const auditDraft = loadAuditSourcesDraft();
+    if (auditDraft) {
+      setAuditSources(auditDraft);
+      setUserTouchedAuditSources(true);
+    }
     setDraftLoaded(true);
   }, []);
 
@@ -339,6 +373,34 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     if (!draftLoaded) return;
     saveProjectContextDraft(repoRequired, projectContext);
   }, [draftLoaded, repoRequired, projectContext]);
+
+  // Audit source default'ları: kullanıcı manuel değiştirmediyse projectContext'e göre otomatik aç/kapa.
+  useEffect(() => {
+    if (!draftLoaded || userTouchedAuditSources) return;
+    setAuditSources({
+      github: !!projectContext.githubRepoUrl?.trim() && repoRequired,
+      supabase: !!projectContext.supabaseProjectRef?.trim() && repoRequired,
+      vercel: !!projectContext.vercelProjectUrl?.trim() && repoRequired,
+      local: !!projectContext.localProjectPath?.trim() && repoRequired,
+      worker: !!projectContext.vpsHost?.trim() && repoRequired,
+    });
+  }, [draftLoaded, userTouchedAuditSources, repoRequired, projectContext.githubRepoUrl, projectContext.supabaseProjectRef, projectContext.vercelProjectUrl, projectContext.localProjectPath, projectContext.vpsHost]);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    saveAuditSourcesDraft(auditSources);
+  }, [draftLoaded, auditSources]);
+
+  const toggleAuditSource = (key: AuditSourceKey) => {
+    setUserTouchedAuditSources(true);
+    setAuditSources((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  useEffect(() => {
+    if (!vercelToast || vercelToast.type !== "success") return;
+    const timer = setTimeout(() => setVercelToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [vercelToast]);
 
   // Read all OAuth callback params on mount + restore from localStorage
   useEffect(() => {
@@ -356,6 +418,17 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     if (params.get("vercel_connected") === "1") {
       updated.vercel = { label: params.get("vercel_username") ?? "", connectedAt: new Date().toISOString() };
       changed = true;
+      setVercelToast({ type: "success", text: "Vercel bağlantısı kuruldu." });
+    }
+    const vercelError = params.get("vercel_error");
+    if (vercelError) {
+      const vercelErrorMap: Record<string, string> = {
+        missing_code: "Vercel bağlantısı başarısız: yetkilendirme kodu alınamadı.",
+        not_configured: "Vercel OAuth yapılandırılmamış. Yöneticiye bildirin.",
+        token_failed: "Vercel token alınamadı. Tekrar deneyin.",
+        network: "Ağ hatası. Tekrar deneyin.",
+      };
+      setVercelToast({ type: "error", text: vercelErrorMap[vercelError] ?? "Vercel bağlantısı başarısız." });
     }
     if (params.get("supabase_connected") === "1") {
       updated.supabase = { label: params.get("supabase_org") ?? "", connectedAt: new Date().toISOString() };
@@ -377,7 +450,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       setSupabaseError(map[supError] ?? "Supabase bağlantısı başarısız.");
     }
 
-    if (changed || supError) {
+    if (changed || supError || vercelError) {
       try { localStorage.setItem("verdict_oauth", JSON.stringify(updated)); } catch {}
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -695,7 +768,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
   const vpsHost = projectContext.vpsHost?.trim() ?? "";
   const localProjectPath = projectContext.localProjectPath?.trim() ?? "";
   const supabaseUrl = projectContext.supabaseProjectUrl?.trim() ?? "";
-  const notes = projectContext.notes?.trim() ?? "";
   const supabaseProjectRef = projectContext.supabaseProjectRef?.trim() ?? "";
   const supabaseProjectName = projectContext.supabaseProjectName?.trim() ?? "";
   // hasGithubUrl: repo URL gerçekten girilmiş → backend'e gidecek
@@ -715,7 +787,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     !!vpsHost,
     !!localProjectPath,
     hasSupabaseConnection,
-    !!notes,
   ].filter(Boolean).length;
   const hasAnyConnection = connectedSourceCount > 0;
   const sourceCountLabel = hasAnyConnection ? `Bağlı kaynak: ${connectedSourceCount}` : "Bağlı kaynak yok";
@@ -759,7 +830,34 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
       problem: problem.trim(), expectedOutput: OUTPUT_BY_TYPE[requestType],
       repoRequired, createdAt: new Date(), status: "analyzing",
       attachments, projectContext: repoRequired ? sanitizedContext() : undefined,
+      auditSources: repoRequired ? auditSources : undefined,
     });
+  };
+
+  // Source-specific availability for toggle disabled state
+  const sourceAvailable = (key: AuditSourceKey): { enabled: boolean; reason?: string } => {
+    switch (key) {
+      case "github":
+        return projectContext.githubRepoUrl?.trim()
+          ? { enabled: true }
+          : { enabled: false, reason: "GitHub repo URL'si bağlanmadı" };
+      case "supabase":
+        return projectContext.supabaseProjectRef?.trim() || projectContext.supabaseProjectUrl?.trim()
+          ? { enabled: true }
+          : { enabled: false, reason: "Supabase projesi bağlanmadı" };
+      case "vercel":
+        return projectContext.vercelProjectUrl?.trim()
+          ? { enabled: true }
+          : { enabled: false, reason: "Vercel proje URL'si bağlanmadı" };
+      case "local":
+        return projectContext.localProjectPath?.trim()
+          ? { enabled: true }
+          : { enabled: false, reason: "Lokal proje yolu girilmedi" };
+      case "worker":
+        return projectContext.vpsHost?.trim()
+          ? { enabled: true }
+          : { enabled: false, reason: "VPS / worker host bilgisi yok" };
+    }
   };
 
   return (
@@ -948,15 +1046,6 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
                   onDisconnect={() => oauthConnections.supabase ? disconnect("supabase") : clearContextKeys(["supabaseProjectUrl", "supabaseProjectRef", "supabaseProjectName", "supabaseOrganizationId", "supabaseConnectionStatus"])}
                 />
               )}
-              {notes && (
-                <ConnectedChip
-                  code="NOT"
-                  label="Ek not"
-                  onEdit={() => openWizard("notes")}
-                  onDisconnect={() => clearContextKeys(["notes"])}
-                  disconnectLabel="Sil"
-                />
-              )}
             </div>
           )}
 
@@ -968,8 +1057,64 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             {!vpsHost && <ConnectButton onClick={() => openWizard("vpsHost")}>VPS Bağla</ConnectButton>}
             {!localProjectPath && <ConnectButton onClick={() => openWizard("localProjectPath")}>Lokal Proje Bağla</ConnectButton>}
             {!hasSupabaseConnection && <ConnectButton onClick={() => { window.location.href = "/api/auth/supabase"; }}>Supabase Bağla</ConnectButton>}
-            {!notes && <ConnectButton onClick={() => openWizard("notes")}>Not Ekle</ConnectButton>}
           </div>
+        </div>
+      )}
+
+      {/* Audit Kaynakları (per-source toggles) */}
+      {repoRequired && (
+        <div className="rounded-lg border border-slate-500/45 bg-slate-700/30 p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">Audit Kaynakları</h3>
+              <p className="mt-0.5 text-xs text-slate-400">
+                Hangi kaynakların audit&apos;e dahil edileceğini seçin. Toggle&apos;ı kapalı kaynaklar dikkate alınmaz ve hata sayılmaz.
+              </p>
+            </div>
+            <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-200">
+              {AUDIT_SOURCE_KEYS.filter((k) => auditSources[k]).length}/5 seçili
+            </span>
+          </div>
+          <ul className="space-y-2">
+            {AUDIT_SOURCE_KEYS.map((key) => {
+              const cfg = AUDIT_SOURCE_LABEL[key];
+              const avail = sourceAvailable(key);
+              const on = auditSources[key];
+              return (
+                <li key={key} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${on ? "border-emerald-300/35 bg-emerald-400/5" : "border-slate-500/45 bg-slate-800/40"}`}>
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    disabled={!avail.enabled}
+                    onClick={() => avail.enabled && toggleAuditSource(key)}
+                    className={`inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                      !avail.enabled ? "bg-slate-700 cursor-not-allowed opacity-60" : on ? "bg-emerald-400 cursor-pointer" : "bg-slate-600 cursor-pointer"
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                  <span className="flex h-7 min-w-[2.25rem] flex-shrink-0 items-center justify-center rounded border border-slate-500/45 bg-slate-900/45 px-1.5 text-[11px] font-black tracking-wide text-slate-200">
+                    {cfg.code}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-100">{cfg.title}</p>
+                    <p className="truncate text-xs text-slate-400">
+                      {avail.enabled ? cfg.subtitle : (avail.reason ?? cfg.subtitle)}
+                    </p>
+                  </div>
+                  <span className={`hidden sm:inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                    !avail.enabled ? "border-slate-500/45 bg-slate-800/55 text-slate-400" :
+                    on ? "border-emerald-300/35 bg-emerald-400/10 text-emerald-200" : "border-slate-500/45 bg-slate-800/55 text-slate-300"
+                  }`}>
+                    {!avail.enabled ? "kaynak bağlı değil" : on ? "audit'e dahil" : "kapalı"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-xs text-slate-500">
+            Seçilen kaynaklar paralel taranır. Kullanıcı tarafından seçilmeyen kaynaklar audit raporunda &quot;seçilmedi&quot; olarak işaretlenir, hata sayılmaz.
+          </p>
         </div>
       )}
 
@@ -1197,6 +1342,24 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           <div className="flex-1 text-sm">{supabaseError}</div>
           <button type="button" onClick={() => setSupabaseError(null)}
             className="text-red-200 hover:text-red-100 cursor-pointer">✕</button>
+        </div>
+      </div>
+    )}
+
+    {/* Vercel toast (success/error) */}
+    {vercelToast && (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4">
+        <div className={`rounded-lg border px-4 py-3 shadow-2xl flex items-start gap-3 ${
+          vercelToast.type === "success"
+            ? "border-emerald-300/30 bg-[#0f2318] text-emerald-100"
+            : "border-red-300/30 bg-[#2a1518] text-red-100"
+        }`}>
+          <span className={vercelToast.type === "success" ? "text-emerald-300" : "text-red-300"}>
+            {vercelToast.type === "success" ? "✓" : "⚠"}
+          </span>
+          <div className="flex-1 text-sm">{vercelToast.text}</div>
+          <button type="button" onClick={() => setVercelToast(null)}
+            className={`cursor-pointer ${vercelToast.type === "success" ? "text-emerald-200 hover:text-emerald-100" : "text-red-200 hover:text-red-100"}`}>✕</button>
         </div>
       </div>
     )}

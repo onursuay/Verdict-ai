@@ -438,7 +438,135 @@ export default function DecisionResult({ request, result, onReset }: DecisionRes
             <p className="mt-2 text-slate-300 leading-relaxed">{request.problem}</p>
           </section>
 
-          {/* Kod Bağlamı — GitHub repo okuma sonucu (FAZ 2A) */}
+          {/* Audit Context Pack — kaynak bazında tarama sonucu */}
+          {result.auditContextPack && (() => {
+            const pack = result.auditContextPack;
+            const SOURCE_LABEL: Record<string, { code: string; title: string }> = {
+              github: { code: "GH", title: "GitHub" },
+              supabase: { code: "SB", title: "Supabase" },
+              vercel: { code: "VC", title: "Vercel" },
+              local: { code: "LP", title: "Lokal Yol" },
+              worker: { code: "VPS", title: "VPS / Worker" },
+            };
+            const STATUS_LABEL: Record<string, { label: string; tone: "ok" | "off" | "warn" | "err" }> = {
+              not_selected: { label: "seçilmedi", tone: "off" },
+              pending: { label: "bekliyor", tone: "warn" },
+              scanning: { label: "taranıyor", tone: "warn" },
+              completed: { label: "tamamlandı", tone: "ok" },
+              error: { label: "hata", tone: "err" },
+              unauthorized: { label: "yetki yok", tone: "err" },
+              timeout: { label: "zaman aşımı", tone: "err" },
+              not_configured: { label: "yapılandırılmadı", tone: "off" },
+            };
+            const tone = (t: "ok" | "warn" | "off" | "err") =>
+              t === "ok" ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200" :
+              t === "warn" ? "border-amber-300/30 bg-amber-400/10 text-amber-200" :
+              t === "err" ? "border-red-300/30 bg-red-400/10 text-red-200" :
+              "border-slate-500/45 bg-slate-800/55 text-slate-400";
+            const confidenceColor =
+              pack.confidence === "high" ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200" :
+              pack.confidence === "medium" ? "border-amber-300/30 bg-amber-400/10 text-amber-200" :
+              pack.confidence === "low" ? "border-red-300/30 bg-red-400/10 text-red-200" :
+              "border-slate-500/45 bg-slate-800/55 text-slate-300";
+            const order: Array<keyof typeof pack.reports> = ["github", "supabase", "vercel", "local", "worker"];
+            return (
+              <>
+                <div className="border-t border-slate-600/35" />
+                <section>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Audit Context Pack</h4>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceColor}`}>
+                        Güven: {pack.confidence}
+                      </span>
+                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${pack.finalDecisionAllowed ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200" : "border-red-300/30 bg-red-400/10 text-red-200"}`}>
+                        {pack.finalDecisionAllowed ? "Final patch için yeterli" : "Final patch için YETERSİZ"}
+                      </span>
+                      <span className="rounded-full border border-slate-500/45 bg-slate-800/55 px-2.5 py-1 text-xs font-semibold text-slate-300">
+                        Mod: {pack.mode}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-3">
+                    Karakter: {pack.totals.contextChars.toLocaleString("tr-TR")} / {pack.totals.contextCharsLimit.toLocaleString("tr-TR")} • ~{pack.totals.approxTokens.toLocaleString("tr-TR")} token • Seçilen: {pack.totals.selectedSources}/5 • Tamamlanan: {pack.totals.completedSources} • Başarısız: {pack.totals.failedSources}
+                  </p>
+                  <ul className="space-y-2">
+                    {order.map((k) => {
+                      const r = pack.reports[k];
+                      const lbl = SOURCE_LABEL[k];
+                      const isSelected = pack.selection[k as keyof typeof pack.selection];
+                      const status = r?.status ?? (isSelected ? "pending" : "not_selected");
+                      const st = STATUS_LABEL[status] ?? STATUS_LABEL.not_selected;
+                      return (
+                        <li key={k} className={`rounded-lg border px-3 py-2 ${isSelected ? "border-slate-500/45 bg-slate-800/40" : "border-slate-500/30 bg-slate-800/20"}`}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="flex h-7 min-w-[2.25rem] items-center justify-center rounded border border-slate-500/45 bg-slate-900/45 px-1.5 text-[11px] font-black tracking-wide text-slate-200">
+                              {lbl?.code}
+                            </span>
+                            <span className="text-sm font-semibold text-slate-100">{lbl?.title}</span>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${tone(st.tone)}`}>
+                              {st.label}
+                            </span>
+                            {r?.critical && (
+                              <span className="rounded-full border border-red-300/30 bg-red-400/10 px-2 py-0.5 text-[10px] font-semibold text-red-200">
+                                kritik
+                              </span>
+                            )}
+                            {typeof r?.promptBlockChars === "number" && r.promptBlockChars > 0 && (
+                              <span className="text-[10px] text-slate-500">
+                                {r.promptBlockChars.toLocaleString("tr-TR")} char
+                              </span>
+                            )}
+                          </div>
+                          {r?.summary && (
+                            <p className="mt-1.5 text-xs text-slate-300">{r.summary}</p>
+                          )}
+                          {r?.detail && r.detail.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5 text-xs text-slate-400">
+                              {r.detail.slice(0, 6).map((d, i) => <li key={i}>• {d}</li>)}
+                            </ul>
+                          )}
+                          {r?.errorMessage && (
+                            <p className="mt-1.5 text-xs text-red-200 bg-red-400/10 border border-red-300/25 rounded px-2 py-1">
+                              {r.errorMessage}
+                            </p>
+                          )}
+                          {r?.warnings && r.warnings.length > 0 && (
+                            <ul className="mt-1 text-[11px] text-amber-200">
+                              {r.warnings.slice(0, 3).map((w, i) => <li key={i}>! {w}</li>)}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {pack.confidenceReason.length > 0 && (
+                    <p className="mt-2 text-xs text-slate-400">
+                      <span className="font-semibold text-slate-300">Güven gerekçesi:</span> {pack.confidenceReason.join(" • ")}
+                    </p>
+                  )}
+                  {pack.finalDecisionBlockers.length > 0 && (
+                    <div className="mt-2 rounded-lg border border-red-300/25 bg-red-400/10 px-3 py-2 text-xs text-red-100">
+                      <p className="font-semibold mb-0.5">Final patch engelleyiciler:</p>
+                      <ul className="space-y-0.5">
+                        {pack.finalDecisionBlockers.map((b, i) => <li key={i}>• {b}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {pack.warnings.length > 0 && (
+                    <div className="mt-2 rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+                      <p className="font-semibold mb-0.5">Bütçe / pipeline uyarıları:</p>
+                      <ul className="space-y-0.5">
+                        {pack.warnings.map((w, i) => <li key={i}>• {w}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </section>
+              </>
+            );
+          })()}
+
+          {/* Kod Bağlamı — GitHub repo okuma sonucu (geriye uyum) */}
           {result.repoContext && (() => {
             const rc = result.repoContext;
             const hasError = !!rc.errorMessage;

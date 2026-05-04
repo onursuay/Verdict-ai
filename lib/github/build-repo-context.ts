@@ -17,7 +17,7 @@ import {
   buildContextText,
   type SelectedFileMeta,
 } from "./repo-context";
-import type { RepoContextSource } from "@/types/decision";
+import type { RepoContextSource } from "../../types/decision";
 
 const PREVIEW_CHARS = 600;
 
@@ -148,6 +148,7 @@ export async function buildRepoContext(input: BuildRepoContextInput): Promise<Bu
       selectedFiles,
       warnings,
       fetchedAt,
+      ...(treeRes.headSha ? { headCommit: treeRes.headSha } : {}),
     },
     contextText: ctx.text,
   };

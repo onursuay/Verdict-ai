@@ -107,6 +107,14 @@ export interface ProjectContext {
   supabaseOrganizationId?: string;
 }
 
+export interface AuditSourceSelectionDTO {
+  github: boolean;
+  supabase: boolean;
+  vercel: boolean;
+  local: boolean;
+  worker: boolean;
+}
+
 export interface DecisionRequest {
   id: string;
   projectName: string;
@@ -119,6 +127,9 @@ export interface DecisionRequest {
   status: DecisionStatus;
   attachments?: DecisionAttachment[];
   projectContext?: ProjectContext;
+  // Kullanıcının açtığı audit kaynakları. Eksikse repoRequired/projectContext'ten
+  // server-side default türetilir (geriye dönük uyum).
+  auditSources?: AuditSourceSelectionDTO;
 }
 
 export type AnalysisSource = "mock" | "live";
@@ -140,6 +151,8 @@ export interface RepoContextSource {
   warnings: string[];
   fetchedAt: string; // ISO timestamp
   errorMessage?: string;
+  // Branch HEAD commit SHA — Vercel production deploy commit ile eşleştirme için.
+  headCommit?: string;
 }
 
 export interface ConnectionUsageSummary {
@@ -159,6 +172,55 @@ export interface ConnectionUsageSummary {
   hasVpsHost: boolean;
 }
 
+// Audit Context Pack — UI ve persistence için DTO biçimi.
+// Backend tarafında gerçek şekli `lib/audit/types.ts` içinde tanımlıdır;
+// burada UI'ya verilen JSON-safe yansımasıdır.
+export interface AuditContextPackDTO {
+  mode: string;
+  selection: AuditSourceSelectionDTO;
+  totals: {
+    contextChars: number;
+    contextCharsLimit: number;
+    approxTokens: number;
+    selectedSources: number;
+    completedSources: number;
+    failedSources: number;
+    notSelectedSources: number;
+  };
+  reports: {
+    github?: AuditSourceReportDTO;
+    supabase?: AuditSourceReportDTO;
+    vercel?: AuditSourceReportDTO;
+    local?: AuditSourceReportDTO;
+    worker?: AuditSourceReportDTO;
+  };
+  confidence: "high" | "medium" | "low" | "insufficient";
+  confidenceReason: string[];
+  finalDecisionAllowed: boolean;
+  finalDecisionBlockers: string[];
+  warnings: string[];
+  generatedAt: string;
+}
+
+export interface AuditSourceReportDTO {
+  kind: "github" | "supabase" | "vercel" | "local" | "worker";
+  selected: boolean;
+  status:
+    | "not_selected" | "pending" | "scanning" | "completed"
+    | "error" | "unauthorized" | "timeout" | "not_configured";
+  summary: string;
+  detail: string[];
+  warnings: string[];
+  errorMessage?: string;
+  critical: boolean;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  promptBlockChars?: number;
+  // Source-specific fields are passed through as-is. UI tarafı tip daraltır.
+  [extra: string]: unknown;
+}
+
 export interface DecisionResult {
   requestId: string;
   analyses: AIAnalysis[];
@@ -176,4 +238,5 @@ export interface DecisionResult {
   followUps?: DecisionFollowUp[];
   repoContext?: RepoContextSource;
   connectionUsageSummary?: ConnectionUsageSummary;
+  auditContextPack?: AuditContextPackDTO;
 }

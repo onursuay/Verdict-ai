@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { AIAnalysis, AnalysisSource, ConnectionUsageSummary, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict, RepoContextSource } from "@/types/decision";
+import { AIAnalysis, AnalysisSource, AuditContextPackDTO, AuditSourceSelectionDTO, ConnectionUsageSummary, DecisionAttachment, DecisionRequest, DecisionResult, FinalVerdict, RepoContextSource } from "@/types/decision";
 import { generateMockDecision } from "@/lib/mock-decision";
 import { generatePromptOutput } from "@/lib/prompt-builder";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { buildRepoContext } from "@/lib/github/build-repo-context";
+import { buildContextPack, defaultSelectionFromContext } from "@/lib/audit/context-pack";
+import type { AuditContextPack, GithubSourceReport } from "@/lib/audit/types";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,55 @@ function cleanExtractedText(text: string): string {
       .slice(0, 15000);
   }
   return text;
+}
+
+// AuditContextPack → DecisionResult'ta UI'a gidecek JSON-safe DTO.
+// Sanitize edilmiş raporlar olduğu gibi eklenir; promptBlock alanı UI'a gönderilmez
+// (token-büyük metin, hashed prompt kayıtlı).
+function auditPackToDTO(pack: AuditContextPack): AuditContextPackDTO {
+  const stripPrompt = <T extends { promptBlock?: string }>(r: T | undefined): T | undefined => {
+    if (!r) return r;
+    const { promptBlock: _p, ...rest } = r as T & { promptBlock?: string };
+    void _p;
+    return rest as T;
+  };
+  return {
+    mode: pack.mode,
+    selection: pack.selection,
+    totals: pack.totals,
+    reports: {
+      ...(pack.reports.github ? { github: stripPrompt(pack.reports.github) as unknown as AuditContextPackDTO["reports"]["github"] } : {}),
+      ...(pack.reports.supabase ? { supabase: stripPrompt(pack.reports.supabase) as unknown as AuditContextPackDTO["reports"]["supabase"] } : {}),
+      ...(pack.reports.vercel ? { vercel: stripPrompt(pack.reports.vercel) as unknown as AuditContextPackDTO["reports"]["vercel"] } : {}),
+      ...(pack.reports.local ? { local: stripPrompt(pack.reports.local) as unknown as AuditContextPackDTO["reports"]["local"] } : {}),
+      ...(pack.reports.worker ? { worker: stripPrompt(pack.reports.worker) as unknown as AuditContextPackDTO["reports"]["worker"] } : {}),
+    },
+    confidence: pack.confidence,
+    confidenceReason: pack.confidenceReason,
+    finalDecisionAllowed: pack.finalDecisionAllowed,
+    finalDecisionBlockers: pack.finalDecisionBlockers,
+    warnings: pack.warnings,
+    generatedAt: pack.generatedAt,
+  };
+}
+
+function githubReportToRepoContextSource(gh: GithubSourceReport): RepoContextSource {
+  return {
+    source: "github",
+    owner: gh.owner ?? "",
+    repo: gh.repo ?? "",
+    branch: gh.branch ?? "",
+    selectedFiles: (gh.selectedFiles ?? []).map((f) => ({
+      path: f.path,
+      size: f.size,
+      language: f.language,
+      reason: f.reason,
+      contentPreview: "",
+    })),
+    warnings: gh.warnings,
+    fetchedAt: gh.startedAt ?? new Date().toISOString(),
+    ...(gh.errorMessage ? { errorMessage: gh.errorMessage } : {}),
+  };
 }
 
 function buildGithubContextBlock(meta: RepoContextSource | null, contextText: string): string {
@@ -538,56 +588,62 @@ export async function POST(req: NextRequest) {
   // request içindeki attachments'ı işlenmiş (dataUrl olmayan) versiyonla güncelle
   const enrichedRequest: DecisionRequest = { ...request, attachments: processedAttachments };
 
-  // Pre-step: GitHub repo context (FAZ 2A) — repoRequired=true ve GitHub URL varsa.
+  // Pre-step: Audit Context Pack — kullanıcı seçimine göre 5 kaynaktan paralel okuma.
+  // Geriye uyum: auditSources gelmezse repoRequired + projectContext'ten default türetilir.
+  const ctx = enrichedRequest.projectContext;
+  const userKey = req.cookies.get("verdict_user_key")?.value
+    || req.cookies.get("supabase_user_key")?.value
+    || "default";
+  const vercelToken = req.cookies.get("vercel_access_token")?.value;
+
+  const sel: AuditSourceSelectionDTO = enrichedRequest.auditSources ?? defaultSelectionFromContext({
+    hasGithubRepo: !!(enrichedRequest.repoRequired && ctx?.githubRepoUrl?.trim()),
+    hasSupabaseProject: !!(enrichedRequest.repoRequired && ctx?.supabaseProjectRef?.trim()),
+    hasVercelToken: !!(enrichedRequest.repoRequired && vercelToken && ctx?.vercelProjectUrl?.trim()),
+    hasLocalPath: !!(enrichedRequest.repoRequired && ctx?.localProjectPath?.trim()),
+    hasVpsHost: !!(enrichedRequest.repoRequired && ctx?.vpsHost?.trim()),
+  });
+
+  let auditPack: AuditContextPack | null = null;
+  let auditPromptBlock = "";
   let repoContext: RepoContextSource | null = null;
   let githubBlock = "";
-  if (enrichedRequest.repoRequired && !enrichedRequest.projectContext?.githubRepoUrl?.trim()) {
-    repoContext = {
-      source: "github",
-      owner: "",
-      repo: "",
-      branch: "",
-      selectedFiles: [],
-      warnings: [],
-      fetchedAt: new Date().toISOString(),
-      errorMessage: "GitHub repo bağlantısı eklenmedi. Kod analizi yalnızca yazılı açıklama ve ek dosyalara dayandırılmıştır.",
-    };
-  }
-  if (enrichedRequest.repoRequired && enrichedRequest.projectContext?.githubRepoUrl?.trim()) {
-    try {
-      const built = await buildRepoContext({
-        githubRepoUrl: enrichedRequest.projectContext.githubRepoUrl,
-        problem: enrichedRequest.problem,
-        requestType: enrichedRequest.requestType,
-        projectName: enrichedRequest.projectName,
-      });
-      repoContext = built.meta;
-      githubBlock = buildGithubContextBlock(built.meta, built.contextText);
-      console.log("[verdict-ai] github context", {
-        owner: built.meta.owner,
-        repo: built.meta.repo,
-        branch: built.meta.branch,
-        files: built.meta.selectedFiles.length,
-        chars: built.contextText.length,
-        warnings: built.meta.warnings.length,
-        error: built.meta.errorMessage ?? null,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "bilinmeyen hata";
-      console.warn("[verdict-ai] github context error:", msg);
-      repoContext = {
-        source: "github",
-        owner: "",
-        repo: "",
-        branch: "",
-        selectedFiles: [],
-        warnings: [],
-        fetchedAt: new Date().toISOString(),
-        errorMessage: "GitHub kod bağlamı alınamadı.",
-      };
-      githubBlock = buildGithubContextBlock(repoContext, "");
+
+  try {
+    const built = await buildContextPack({
+      requestType: enrichedRequest.requestType,
+      problem: enrichedRequest.problem,
+      projectName: enrichedRequest.projectName,
+      selection: sel,
+      github: { repoUrl: ctx?.githubRepoUrl },
+      supabase: { userKey, projectRef: ctx?.supabaseProjectRef, projectName: ctx?.supabaseProjectName },
+      vercel: { accessToken: vercelToken, projectUrl: ctx?.vercelProjectUrl },
+      local: { path: ctx?.localProjectPath },
+      worker: { vpsHost: ctx?.vpsHost },
+    });
+    auditPack = built.pack;
+    auditPromptBlock = built.promptBlock;
+
+    const gh = built.pack.reports.github;
+    if (gh) {
+      repoContext = githubReportToRepoContextSource(gh);
+      // promptBlock zaten audit pack'te toplanıyor — eski githubBlock değişkenine
+      // tekrar yazmıyoruz; tüm audit context auditPromptBlock'ta.
     }
+
+    console.log("[verdict-ai] audit pack", {
+      mode: built.pack.mode,
+      selection: built.pack.selection,
+      totals: built.pack.totals,
+      confidence: built.pack.confidence,
+      finalDecisionAllowed: built.pack.finalDecisionAllowed,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "bilinmeyen hata";
+    console.warn("[verdict-ai] audit pack error:", msg);
   }
+  // Eski isim için alias: githubBlock = auditPromptBlock (Claude/Codex/Judge promptlarına aktarılır).
+  githubBlock = auditPromptBlock;
 
   const mockResult = generateMockDecision(enrichedRequest);
   const mockClaudeAnalysis = mockResult.analyses.find((a) => a.role === "claude_engineer")!;
@@ -692,7 +748,6 @@ export async function POST(req: NextRequest) {
     geminiAnalysis
   );
 
-  const ctx = enrichedRequest.projectContext;
   const connectionUsageSummary: ConnectionUsageSummary = {
     repoRequired: !!enrichedRequest.repoRequired,
     hasGithubRepoUrl: !!ctx?.githubRepoUrl?.trim(),
@@ -709,6 +764,7 @@ export async function POST(req: NextRequest) {
     hasVercelUrl: !!ctx?.vercelProjectUrl?.trim(),
     hasVpsHost: !!ctx?.vpsHost?.trim(),
   };
+  const auditPackDTO: AuditContextPackDTO | undefined = auditPack ? auditPackToDTO(auditPack) : undefined;
 
   const finalResult: DecisionResult = {
     ...mockResult,
@@ -726,6 +782,7 @@ export async function POST(req: NextRequest) {
     geminiSource,
     ...(geminiError ? { geminiError } : {}),
     ...(repoContext ? { repoContext } : {}),
+    ...(auditPackDTO ? { auditContextPack: auditPackDTO } : {}),
     connectionUsageSummary,
   };
 

@@ -1,5 +1,5 @@
-import { getSupabaseServer } from "@/lib/supabase-server";
-import { decryptToken, encryptToken } from "@/lib/credentials/encryption";
+import { getSupabaseServer } from "../supabase-server";
+import { decryptToken, encryptToken } from "../credentials/encryption";
 
 export interface SupabaseConnectionRow {
   id: string;

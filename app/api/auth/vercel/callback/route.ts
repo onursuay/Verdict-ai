@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "";
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   if (!code) {
@@ -38,9 +37,8 @@ export async function GET(req: NextRequest) {
     const userData = (await userRes.json()) as { user?: { username?: string; name?: string } };
     const username = userData.user?.username ?? userData.user?.name ?? "";
 
-    // Redirect popup to `next` (tells Vercel installation succeeded)
-    // Also store username in a readable cookie so VerdictAI can pick it up on next load
-    const destination = next || `${appUrl}/?vercel_connected=1&vercel_username=${encodeURIComponent(username)}`;
+    // Always redirect back to our own app — never follow external `next` params (open redirect risk).
+    const destination = `${appUrl}/?vercel_connected=1&vercel_username=${encodeURIComponent(username)}`;
     const response = NextResponse.redirect(destination);
 
     response.cookies.set("vercel_access_token", tokenData.access_token, {
