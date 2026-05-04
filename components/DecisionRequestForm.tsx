@@ -789,7 +789,10 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
     hasSupabaseConnection,
   ].filter(Boolean).length;
   const hasAnyConnection = connectedSourceCount > 0;
-  const sourceCountLabel = hasAnyConnection ? `Bağlı kaynak: ${connectedSourceCount}` : "Bağlı kaynak yok";
+  const selectedAuditCount = AUDIT_SOURCE_KEYS.filter((k) => auditSources[k]).length;
+  const sourceCountLabel = repoRequired
+    ? `${selectedAuditCount}/5 audit'e dahil`
+    : hasAnyConnection ? `Bağlı kaynak: ${connectedSourceCount}` : "Bağlı kaynak yok";
   const analysisStateMessage = repoRequired
     ? hasGithubOAuthOnly
       ? "GitHub hesabı bağlı ancak repo seçilmedi. Kod bağlamı için repo seçin."
@@ -846,9 +849,9 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
           ? { enabled: true }
           : { enabled: false, reason: "Supabase projesi bağlanmadı" };
       case "vercel":
-        return projectContext.vercelProjectUrl?.trim()
+        return oauthConnections.vercel || projectContext.vercelProjectUrl?.trim()
           ? { enabled: true }
-          : { enabled: false, reason: "Vercel proje URL'si bağlanmadı" };
+          : { enabled: false, reason: "Vercel hesabı bağlı değil" };
       case "local":
         return projectContext.localProjectPath?.trim()
           ? { enabled: true }
@@ -964,7 +967,7 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
             </div>
           </div>
           <span className={`w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            hasAnyConnection
+            repoRequired || hasAnyConnection
               ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
               : "border-slate-500/45 bg-slate-800/55 text-slate-300"
           }`}>
@@ -973,106 +976,18 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
         </div>
       </div>
 
-      {/* Proje Bağlantıları */}
-      {repoRequired && (
-        <div className="rounded-lg border border-slate-500/45 bg-slate-700/30 p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-100">Proje Bağlantıları</h3>
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-              hasAnyConnection
-                ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-200"
-                : "border-slate-500/45 bg-slate-800/55 text-slate-300"
-            }`}>
-              {sourceCountLabel}
-            </span>
-          </div>
-
-          {hasAnyConnection && (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {hasGithubConnection && (
-                <ConnectedChip
-                  code="GH"
-                  label={githubLabel}
-                  onEdit={openGithubRepoModal}
-                  onDisconnect={() => oauthConnections.github ? disconnect("github") : clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}
-                />
-              )}
-              {hasGithubOAuthOnly && (
-                <ConnectedChip
-                  code="GH"
-                  label={oauthConnections.github?.label || "GitHub bağlı"}
-                  onEdit={openGithubRepoModal}
-                  editLabel="Repo Seç"
-                  onDisconnect={() => disconnect("github")}
-                />
-              )}
-              {liveUrl && (
-                <ConnectedChip
-                  code="URL"
-                  label={liveLabel}
-                  onEdit={() => openWizard("liveUrl")}
-                  onDisconnect={() => clearContextKeys(["liveUrl", "liveUrlStatus"])}
-                />
-              )}
-              {hasVercelConnection && (
-                <ConnectedChip
-                  code="VC"
-                  label={vercelSourceLabel}
-                  onEdit={() => openWizard("vercelProjectUrl")}
-                  onDisconnect={() => oauthConnections.vercel ? disconnect("vercel") : clearContextKeys(["vercelProjectUrl"])}
-                />
-              )}
-              {vpsHost && (
-                <ConnectedChip
-                  code="VPS"
-                  label={vpsHost}
-                  onEdit={() => openWizard("vpsHost")}
-                  onDisconnect={() => clearContextKeys(["vpsHost"])}
-                />
-              )}
-              {localProjectPath && (
-                <ConnectedChip
-                  code="LP"
-                  label={pathLabel(localProjectPath)}
-                  onEdit={() => openWizard("localProjectPath")}
-                  onDisconnect={() => clearContextKeys(["localProjectPath"])}
-                />
-              )}
-              {hasSupabaseConnection && (
-                <ConnectedChip
-                  code="SB"
-                  label={supabaseLabel}
-                  onEdit={oauthConnections.supabase ? openSupabaseProjectModal : () => openWizard("supabaseProjectUrl")}
-                  onDisconnect={() => oauthConnections.supabase ? disconnect("supabase") : clearContextKeys(["supabaseProjectUrl", "supabaseProjectRef", "supabaseProjectName", "supabaseOrganizationId", "supabaseConnectionStatus"])}
-                />
-              )}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            {!hasGithubConnection && !hasGithubOAuthOnly && <ConnectButton onClick={() => { window.location.href = "/api/auth/github"; }}>GitHub Bağla</ConnectButton>}
-            {hasGithubOAuthOnly && <ConnectButton onClick={openGithubRepoModal}>Repo Seç</ConnectButton>}
-            {!liveUrl && <ConnectButton onClick={() => openWizard("liveUrl")}>Canlı Site Bağla</ConnectButton>}
-            {!hasVercelConnection && <ConnectButton onClick={() => { window.location.href = "/api/auth/vercel"; }}>Vercel Bağla</ConnectButton>}
-            {!vpsHost && <ConnectButton onClick={() => openWizard("vpsHost")}>VPS Bağla</ConnectButton>}
-            {!localProjectPath && <ConnectButton onClick={() => openWizard("localProjectPath")}>Lokal Proje Bağla</ConnectButton>}
-            {!hasSupabaseConnection && <ConnectButton onClick={() => { window.location.href = "/api/auth/supabase"; }}>Supabase Bağla</ConnectButton>}
-          </div>
-        </div>
-      )}
-
-      {/* Audit Kaynakları (per-source toggles) */}
+      {/* Audit Kaynakları */}
       {repoRequired && (
         <div className="rounded-lg border border-slate-500/45 bg-slate-700/30 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-slate-100">Audit Kaynakları</h3>
               <p className="mt-0.5 text-xs text-slate-400">
-                Hangi kaynakların audit&apos;e dahil edileceğini seçin. Toggle&apos;ı kapalı kaynaklar dikkate alınmaz ve hata sayılmaz.
+                Bağla, düzenle ve hangi kaynakların audit&apos;e dahil edileceğini seç.
               </p>
             </div>
             <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-200">
-              {AUDIT_SOURCE_KEYS.filter((k) => auditSources[k]).length}/5 seçili
+              {selectedAuditCount}/5 audit&apos;e dahil
             </span>
           </div>
           <ul className="space-y-2">
@@ -1081,39 +996,147 @@ export default function DecisionRequestForm({ onSubmit, isLoading }: DecisionReq
               const avail = sourceAvailable(key);
               const on = auditSources[key];
               return (
-                <li key={key} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${on ? "border-emerald-300/35 bg-emerald-400/5" : "border-slate-500/45 bg-slate-800/40"}`}>
-                  <button
-                    type="button"
-                    aria-pressed={on}
-                    disabled={!avail.enabled}
-                    onClick={() => avail.enabled && toggleAuditSource(key)}
-                    className={`inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                      !avail.enabled ? "bg-slate-700 cursor-not-allowed opacity-60" : on ? "bg-emerald-400 cursor-pointer" : "bg-slate-600 cursor-pointer"
-                    }`}
-                  >
-                    <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
-                  <span className="flex h-7 min-w-[2.25rem] flex-shrink-0 items-center justify-center rounded border border-slate-500/45 bg-slate-900/45 px-1.5 text-[11px] font-black tracking-wide text-slate-200">
-                    {cfg.code}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-100">{cfg.title}</p>
-                    <p className="truncate text-xs text-slate-400">
-                      {avail.enabled ? cfg.subtitle : (avail.reason ?? cfg.subtitle)}
-                    </p>
+                <li key={key} className={`flex flex-col gap-2 rounded-lg border px-3 py-2.5 ${on && avail.enabled ? "border-emerald-300/35 bg-emerald-400/5" : "border-slate-500/45 bg-slate-800/40"}`}>
+                  {/* Main row: toggle + code + name */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      aria-pressed={on}
+                      disabled={!avail.enabled}
+                      onClick={() => avail.enabled && toggleAuditSource(key)}
+                      className={`inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                        !avail.enabled ? "bg-slate-700 cursor-not-allowed opacity-60" : on ? "bg-emerald-400 cursor-pointer" : "bg-slate-600 cursor-pointer"
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-6" : "translate-x-1"}`} />
+                    </button>
+                    <span className="flex h-7 min-w-[2.25rem] flex-shrink-0 items-center justify-center rounded border border-slate-500/45 bg-slate-900/45 px-1.5 text-[11px] font-black tracking-wide text-slate-200">
+                      {cfg.code}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-100">{cfg.title}</p>
+                      <p className="truncate text-xs text-slate-400">
+                        {avail.enabled ? cfg.subtitle : (avail.reason ?? cfg.subtitle)}
+                      </p>
+                    </div>
                   </div>
-                  <span className={`hidden sm:inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                    !avail.enabled ? "border-slate-500/45 bg-slate-800/55 text-slate-400" :
-                    on ? "border-emerald-300/35 bg-emerald-400/10 text-emerald-200" : "border-slate-500/45 bg-slate-800/55 text-slate-300"
-                  }`}>
-                    {!avail.enabled ? "kaynak bağlı değil" : on ? "audit'e dahil" : "kapalı"}
-                  </span>
+                  {/* Connection row: chip + action buttons */}
+                  <div className="ml-[3.75rem] flex flex-wrap items-center gap-1.5">
+                    {key === "github" && (
+                      <>
+                        {(hasGithubConnection || hasGithubOAuthOnly) ? (
+                          <>
+                            <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-200 max-w-[14rem] truncate">
+                              {hasGithubConnection ? githubLabel : (oauthConnections.github?.label || "GitHub bağlı")}
+                            </span>
+                            <button type="button" onClick={openGithubRepoModal}
+                              className="rounded border border-slate-500/45 bg-slate-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 hover:border-emerald-300/45 hover:text-emerald-100 transition cursor-pointer">
+                              {hasGithubOAuthOnly ? "Repo Seç" : "Repo Değiştir"}
+                            </button>
+                            <button type="button"
+                              onClick={() => oauthConnections.github ? disconnect("github") : clearContextKeys(["githubRepoUrl", "githubConnectionStatus", "githubRepoFullName"])}
+                              className="rounded border border-slate-500/35 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400 hover:border-red-300/45 hover:text-red-200 transition cursor-pointer">
+                              Kes
+                            </button>
+                          </>
+                        ) : (
+                          <ConnectButton onClick={() => { window.location.href = "/api/auth/github"; }}>GitHub Bağla</ConnectButton>
+                        )}
+                      </>
+                    )}
+                    {key === "supabase" && (
+                      <>
+                        {hasSupabaseConnection ? (
+                          <>
+                            <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-200 max-w-[14rem] truncate">
+                              {supabaseLabel}
+                            </span>
+                            <button type="button" onClick={oauthConnections.supabase ? openSupabaseProjectModal : () => openWizard("supabaseProjectUrl")}
+                              className="rounded border border-slate-500/45 bg-slate-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 hover:border-emerald-300/45 hover:text-emerald-100 transition cursor-pointer">
+                              Değiştir
+                            </button>
+                            <button type="button"
+                              onClick={() => oauthConnections.supabase ? disconnect("supabase") : clearContextKeys(["supabaseProjectUrl", "supabaseProjectRef", "supabaseProjectName", "supabaseOrganizationId", "supabaseConnectionStatus"])}
+                              className="rounded border border-slate-500/35 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400 hover:border-red-300/45 hover:text-red-200 transition cursor-pointer">
+                              Kes
+                            </button>
+                          </>
+                        ) : (
+                          <ConnectButton onClick={() => { window.location.href = "/api/auth/supabase"; }}>Supabase Bağla</ConnectButton>
+                        )}
+                      </>
+                    )}
+                    {key === "vercel" && (
+                      <>
+                        {(oauthConnections.vercel || vercelUrl) ? (
+                          <>
+                            <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-200 max-w-[14rem] truncate">
+                              {vercelUrl ? vercelSourceLabel : (oauthConnections.vercel?.label || "Vercel bağlı")}
+                            </span>
+                            <button type="button" onClick={() => openWizard("vercelProjectUrl")}
+                              className="rounded border border-slate-500/45 bg-slate-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 hover:border-emerald-300/45 hover:text-emerald-100 transition cursor-pointer">
+                              {vercelUrl ? "Proje Değiştir" : "Proje Ekle"}
+                            </button>
+                            <button type="button"
+                              onClick={() => oauthConnections.vercel ? disconnect("vercel") : clearContextKeys(["vercelProjectUrl"])}
+                              className="rounded border border-slate-500/35 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400 hover:border-red-300/45 hover:text-red-200 transition cursor-pointer">
+                              Kes
+                            </button>
+                          </>
+                        ) : (
+                          <ConnectButton onClick={() => { window.location.href = "/api/auth/vercel"; }}>Vercel Bağla</ConnectButton>
+                        )}
+                      </>
+                    )}
+                    {key === "local" && (
+                      <>
+                        {localProjectPath ? (
+                          <>
+                            <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-200 max-w-[14rem] truncate">
+                              {pathLabel(localProjectPath)}
+                            </span>
+                            <button type="button" onClick={() => openWizard("localProjectPath")}
+                              className="rounded border border-slate-500/45 bg-slate-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 hover:border-emerald-300/45 hover:text-emerald-100 transition cursor-pointer">
+                              Değiştir
+                            </button>
+                            <button type="button" onClick={() => clearContextKeys(["localProjectPath"])}
+                              className="rounded border border-slate-500/35 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400 hover:border-red-300/45 hover:text-red-200 transition cursor-pointer">
+                              Kes
+                            </button>
+                          </>
+                        ) : (
+                          <ConnectButton onClick={() => openWizard("localProjectPath")}>Yol Ekle</ConnectButton>
+                        )}
+                      </>
+                    )}
+                    {key === "worker" && (
+                      <>
+                        {vpsHost ? (
+                          <>
+                            <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-200 max-w-[14rem] truncate">
+                              {vpsHost}
+                            </span>
+                            <button type="button" onClick={() => openWizard("vpsHost")}
+                              className="rounded border border-slate-500/45 bg-slate-800/60 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 hover:border-emerald-300/45 hover:text-emerald-100 transition cursor-pointer">
+                              Değiştir
+                            </button>
+                            <button type="button" onClick={() => clearContextKeys(["vpsHost"])}
+                              className="rounded border border-slate-500/35 px-2.5 py-0.5 text-[11px] font-semibold text-slate-400 hover:border-red-300/45 hover:text-red-200 transition cursor-pointer">
+                              Kes
+                            </button>
+                          </>
+                        ) : (
+                          <ConnectButton onClick={() => openWizard("vpsHost")}>VPS Bağla</ConnectButton>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </li>
               );
             })}
           </ul>
           <p className="mt-3 text-xs text-slate-500">
-            Seçilen kaynaklar paralel taranır. Kullanıcı tarafından seçilmeyen kaynaklar audit raporunda &quot;seçilmedi&quot; olarak işaretlenir, hata sayılmaz.
+            Seçilen kaynaklar paralel taranır. Toggle&apos;ı kapalı kaynaklar audit raporunda &quot;seçilmedi&quot; olarak işaretlenir, hata sayılmaz.
           </p>
         </div>
       )}
